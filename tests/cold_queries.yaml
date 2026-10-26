@@ -1,0 +1,108 @@
+# Cold held-out set for triage retrieval.
+# Written without seeing the retriever, phrases.yaml or the tuned query sets.
+# Run ONCE, no tuning, report score and every miss. Do not edit after the run.
+# expect: runbook number(s) that count as correct in the top 3; [] means nothing should match (or weak only).
+
+cold:
+  - q: "Every single person got kicked out of SSO at about nine this morning and nobody touched anything"
+    expect: ["01"]
+    also_ok: ["02"]
+    tests: whole-org outage with no error text
+
+  - q: "The identity provider's logs show the sign-in worked, but the app says the response timestamp isn't valid"
+    expect: ["02"]
+    tests: IdP-succeeds-SP-rejects, time wording without the word clock
+
+  - q: "We changed the app's web address over the weekend and now clicking login goes straight to an error about an invalid parameter"
+    expect: ["03"]
+    tests: URL change plus partial error text
+
+  - q: "None of our directory accounts can sign in but the local break-glass admin still can"
+    expect: ["04"]
+    tests: LDAP failure without saying LDAP or bind
+
+  - q: "Since the new access points went in, staff can't get onto the corporate wifi and the authentication server never answers"
+    expect: ["05"]
+    tests: RADIUS without saying RADIUS or secret
+
+  - q: "nginx is giving a 502 but the developers say their service is running fine"
+    expect: ["06"]
+    also_ok: ["10"]
+    tests: 502 disambiguation, generic version
+
+  - q: "I put my password in, the screen just sits there for a few seconds and then says gateway timeout"
+    expect: ["07"]
+    tests: 504 from user's point of view
+
+  - q: "The first few logins of the day are fine, then everyone gets error 429"
+    expect: ["08"]
+    tests: rate limit by status code only
+
+  - q: "Since the new load balancer went in, SAML says invalid request and the OIDC users land on an address with the wrong port"
+    expect: ["09"]
+    tests: two-protocol symptom pointing to forwarded headers
+
+  - q: "Since the nginx change a handful of users get bad gateway at the sign-in page, always the same people"
+    expect: ["10"]
+    also_ok: ["06"]
+    tests: 502 disambiguation, header-size variant
+
+  - q: "Our app server's token request to the IdP fails with proxy error 407"
+    expect: ["11"]
+    tests: egress proxy auth by status code
+
+  - q: "Calls from our application server to the identity provider get a 403 from the corporate proxy"
+    expect: ["12"]
+    also_ok: ["11"]
+    tests: proxy policy block vs IdP refusal
+
+  - q: "The backend says certificate verify failed when it talks to the IdP, but the IdP's certificate looks fine in the browser"
+    expect: ["13"]
+    also_ok: ["01"]
+    tests: TLS interception vs expired signing cert
+
+  - q: "After the redeploy our app can't resolve the IdP's hostname"
+    expect: ["14"]
+    tests: NO_PROXY bypass described as DNS
+
+  - q: "Edge says the site has redirected me too many times, even in a private window"
+    expect: ["15"]
+    tests: redirect loop without the word loop or cookies
+
+  - q: "I'm logged in but the dashboard can't fetch any data, the API keeps saying unauthorised"
+    expect: ["16"]
+    tests: API 401 with British spelling
+
+  - q: "Sign-in shows the planned maintenance notice but the work finished yesterday"
+    expect: ["17"]
+    tests: 503 maintenance left on
+
+  - q: "A partner's integration started getting 400 bad request from our endpoint on the day their certificate ran out"
+    expect: ["18"]
+    also_ok: ["01"]
+    tests: mTLS client cert vs signing cert
+
+  - q: "fetch from the web page fails with a network error but the same request with curl returns data"
+    expect: ["19"]
+    tests: CORS without saying CORS
+
+  # Should return nothing (or weak only)
+  - q: "I forgot my password and the reset email never arrives"
+    expect: []
+    tests: password reset is out of scope
+
+  - q: "Teams keeps asking me to sign in again"
+    expect: []
+    tests: borderline; must not be a strong match for 16
+
+  - q: "My laptop fan has been really loud since the update"
+    expect: []
+    tests: hardware noise near 'since the update'
+
+  - q: "Can you add a new user called Priya to the finance group?"
+    expect: []
+    tests: admin request, not a fault
+
+  - q: "The printer on the second floor shows as offline"
+    expect: []
+    tests: unrelated infrastructure
