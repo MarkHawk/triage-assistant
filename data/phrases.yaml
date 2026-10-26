@@ -1,0 +1,132 @@
+# How people really describe these problems, mapped to identity-lab runbooks
+# (by number). Used by triage/retrieval.py.
+#   say:   a phrase that must appear in the ticket, words in order
+#   near:  words that must all appear close together, in any order
+#   runbooks: {runbook number: weight}; weights add up, capped
+#   hint:  a user-side cause. It has no runbook; it stops weak keyword matches
+#          from forcing one when nothing stronger agrees.
+# Matching ignores case and punctuation and treats simple plurals alike.
+
+# 15 redirect loop
+- say: [goes round in circles, round and round, going round in circles, goes in circles, keeps redirecting, keeps reloading, bounces back and forth, redirected you too many times, too many redirects, isn't redirecting properly, not redirecting properly, ping pong]
+  near: [[circles, page], [loop, redirect], [bounce, login, again]]
+  runbooks: {15: 3.0}
+- say: [clearing cookies didn't help, deleting cookies didn't help, cleared cookies and it still, bounces me back to the login]
+  runbooks: {15: 1.5}
+
+# 3 redirect URI mismatch
+- say: [something about a redirect, says redirect, invalid parameter, invalid redirect, wrong redirect, redirect uri, redirect address]
+  runbooks: {3: 2.0, 15: 0.6}
+- say: [moved the app, new url, changed the url, changed the address, new address, new hostname]
+  near: [[url, sign, error], [address, sign, error], [url, login, error]]
+  runbooks: {3: 1.5}
+- say: [error before it asks for a password, error before the login, before any login form, before the password]
+  runbooks: {3: 1.5, 9: 0.5}
+
+# 1 expired signing certificate
+- say: [certificate expired, expired certificate, certificate has expired, signing certificate]
+  near: [[certificate, expire, saml], [certificate, expire, sign]]
+  runbooks: {1: 2.5, 18: 0.5}
+- say: [stopped working for everyone, nothing changed on our side, everyone locked out, since this morning for everyone]
+  runbooks: {1: 1.0, 2: 0.6, 4: 0.5}
+
+# 2 clock skew
+- say: [time is wrong, clock is wrong, clock skew, time drift, out of sync, not valid yet, timestamp, server time, system clock, clock is off, time is off]
+  near: [[time, wrong], [clock, wrong], [response, expired, time]]
+  runbooks: {2: 3.0}
+- say: [works on and off, works sometimes, random failures, only some of the time]
+  runbooks: {2: 0.8, 6: 0.3}
+
+- say: [assertion is too old, assertion has expired, response is too old, response has expired, too old, already expired, expired already, only just clicked, just clicked]
+  near: [[assertion, old], [assertion, expired], [response, expired, clicked]]
+  runbooks: {2: 2.5}
+- say: [all of us, everyone, everybody, nobody can, no one can, none of us, whole company, whole team]
+  runbooks: {1: 0.5, 2: 0.4, 4: 0.4, 17: 0.3}
+
+# 4 LDAP bind failure
+- say: [passwords are wrong and they're not, says our passwords are wrong, password is wrong but it isn't, password is wrong but it is not, correct password rejected, right password rejected]
+  near: [[password, wrong, directory], [password, rejected, directory], [admin, works, nobody]]
+  runbooks: {4: 2.5}
+- say: [admin account works, local account works, only directory users, only ldap users, only people from the directory, staff directory, active directory, user directory]
+  runbooks: {4: 2.0}
+
+# 5 RADIUS
+- say: [wi-fi, wifi, wireless, vpn, radius, network password, access point, switch port, nas]
+  near: [[wi, fi, connect], [vpn, time, out], [vpn, login]]
+  runbooks: {5: 2.5}
+
+# 6 and 10 bad gateway
+- say: [bad gateway, 502, gateway error, blank then error]
+  runbooks: {6: 2.0, 10: 1.0}
+- say: [health checks are green, monitoring says healthy, monitoring says it is healthy, status page is green, says the app is healthy]
+  runbooks: {6: 1.0, 17: 0.8, 19: 0.4}
+- say: [always the same people, only some users, only some people, only certain users, many cookies, lots of cookies, big cookies]
+  runbooks: {10: 2.5}
+
+# 7 gateway timeout
+- say: [gateway time-out, gateway timeout, 504, hangs and then, spins for ages, spins and then, takes ages then fails, waits then fails, timed out after, times out after]
+  near: [[wait, second, fail], [spin, error], [hang, error]]
+  runbooks: {7: 2.5}
+- say: [but i am logged in, but i'm logged in, actually logged in, worked in the end, it worked on the second try, if i try again later it works]
+  runbooks: {7: 1.5}
+
+# 8 rate limit
+- say: [too many requests, 429, rate limit, rate limited, limiting requests, everyone at once, all sign in at the same time, same time on monday, first person in the morning]
+  near: [[lots, staff, same, time, refuses], [everyone, same, time, fail], [many, people, same, time]]
+  runbooks: {8: 3.0}
+
+# 9 forwarded headers
+- say: [invalid request, wrong address, wrong port, no port, without the port, port is missing, port number missing, sent to the wrong address, sends people to the wrong]
+  near: [[invalid, request, saml], [https, without, port], [address, missing, port]]
+  runbooks: {9: 3.0}
+
+# 11 407 proxy auth
+- say: [407, proxy authentication required, proxy asks for a username, proxy wants a login, proxy requires a login, proxy needs a password, proxy login]
+  near: [[proxy, username, password, app], [proxy, credential], [proxy, ask, login]]
+  runbooks: {11: 3.0}
+- say: [only on our app servers, only the app servers, app server can't reach, server can't reach the login server, app can't reach the identity]
+  runbooks: {11: 0.8, 12: 0.8, 13: 0.5, 14: 0.8}
+
+# 12 proxy policy block
+- say: [forbidden, 403, filter, blocked by the proxy, proxy is blocking, web filter, content filter, blocklist, block list, category block, security team blocked, blocking us]
+  near: [[proxy, block], [proxy, forbidden], [filter, identity], [filter, login, server]]
+  runbooks: {12: 3.0}
+
+# 13 TLS interception
+- say: [certificate verify failed, certificate is invalid, certificate not trusted, doesn't trust the certificate, does not trust the certificate, self signed certificate, ssl inspection, tls inspection, inspection, intercept, corporate ca, security team turned on]
+  near: [[certificate, fine, browser], [certificate, invalid, browser]]
+  runbooks: {13: 3.0, 1: 0.3}
+
+# 14 NO_PROXY bypass
+- say: [can't resolve, cannot resolve, failed to resolve, name resolution, dns is broken, dns seems broken, dns problem, no_proxy, after the redeploy, after the redeployment, didn't change the code, code didn't change]
+  near: [[resolve, name, server], [dns, login, server], [dns, identity]]
+  runbooks: {14: 3.0}
+
+# 16 API bearer 401
+- say: [401, unauthorised, unauthorized, can't load any data, cannot load any data, nothing loads, no data loads, data service rejects, rejected by the api, api says, token expired, access token, bearer]
+  near: [[sign, in, 401], [log, in, 401], [logged, in, rejected], [data, rejected]]
+  runbooks: {16: 3.0}
+- say: [works for a few minutes, a few minutes after login, a few minutes after signing in, until i log in again, until i sign in again, stops working after a few minutes, then everything fails]
+  runbooks: {16: 2.5}
+
+# 17 maintenance
+- say: [maintenance, planned maintenance, 503, service unavailable, down for maintenance, maintenance page, maintenance banner, maintenance window]
+  runbooks: {17: 3.0}
+
+# 18 mutual TLS
+- say: [client certificate, no required ssl certificate, ssl certificate error, mutual tls, mtls, partner feed, supplier feed, supplier connection, partner connection, partner system, 400 bad request, certificate was sent]
+  near: [[partner, certificate], [supplier, certificate], [partner, 400], [supplier, 400], [feed, 400]]
+  runbooks: {18: 3.0}
+
+# 19 CORS
+- say: [cors, blocked by cors, works in postman, works with curl, works in curl, failed to fetch, network error, cross origin, cross-origin, access-control-allow-origin]
+  near: [[postman, browser], [curl, browser], [console, blocked]]
+  runbooks: {19: 3.0}
+
+# User-side causes: not a lab fault.
+- say: [forgot my password, forgotten my password, forgot password, reset my password, password reset, caps lock, wrong password, mistyped, typed it wrong, locked out after, too many attempts]
+  hint: user-side cause such as a forgotten or mistyped password
+- say: [bookmark, favourites, favorites, old link, old url, saved link, history link, autofill, saved password, browser remembered]
+  hint: user-side cause such as an old bookmark or a stale saved link
+- say: [new starter, new joiner, no access yet, not set up yet, haven't been given access, need access]
+  hint: access request rather than a fault

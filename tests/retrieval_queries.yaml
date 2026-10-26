@@ -1,0 +1,60 @@
+# Plain-language queries for the retrieval tests. "runbook" is the number of the
+# runbook a good engineer would open first; null means nothing in the lab fits.
+# dev:      used while tuning data/phrases.yaml
+# held-out: written before tuning, looked at once at the end (see README)
+- {id: d01, split: dev, runbook: 1, text: "Everyone on the team gets thrown out when they open the staff portal. It was fine on Friday and nothing changed on our side."}
+- {id: d02, split: dev, runbook: 2, text: "After signing in the portal complains that the time is wrong, something about a timestamp."}
+- {id: d03, split: dev, runbook: 15, text: "The expenses page goes round in circles and never loads."}
+- {id: d04, split: dev, runbook: 3, text: "I click log in and get an error page from the login server that says something about a redirect."}
+- {id: d05, split: dev, runbook: 4, text: "Only people from the staff directory can't sign in. The local admin account still works."}
+- {id: d06, split: dev, runbook: 5, text: "Nobody can get on the office wifi since the new controller went in."}
+- {id: d07, split: dev, runbook: 6, text: "The staff portal shows Bad Gateway."}
+- {id: d08, split: dev, runbook: 7, text: "Expenses login spins for ages after we type the password and then shows a gateway time-out."}
+- {id: d09, split: dev, runbook: 8, text: "It says too many requests when we all log in on Monday morning."}
+- {id: d10, split: dev, runbook: 9, text: "The login page says Invalid Request and the expenses app sends me to a strange address with no port."}
+- {id: d11, split: dev, runbook: 10, text: "Only some people get Bad Gateway when signing in, always the same people. I think they have lots of cookies."}
+- {id: d12, split: dev, runbook: 11, text: "Our app server can't reach the login server since the network team changed the proxy. It asks for a username and password."}
+- {id: d13, split: dev, runbook: 12, text: "The app says forbidden when it talks to the identity server. The proxy team added a web filter last night."}
+- {id: d14, split: dev, runbook: 13, text: "The app says certificate verify failed for the identity server but the certificate looks fine in my browser. Security turned on inspection."}
+- {id: d15, split: dev, runbook: 14, text: "After the redeploy the app says it cannot resolve the login server's name. DNS seems broken."}
+- {id: d16, split: dev, runbook: 16, text: "I can sign in but the expenses page says 401 unauthorised when it loads my claims."}
+- {id: d17, split: dev, runbook: 16, text: "It works for a few minutes after I sign in, then everything fails until I sign in again."}
+- {id: d18, split: dev, runbook: 17, text: "Sign in says it is down for planned maintenance, and that was hours ago."}
+- {id: d19, split: dev, runbook: 18, text: "Our supplier feed gets 400 bad request, no required SSL certificate was sent."}
+- {id: d20, split: dev, runbook: 19, text: "The web page can't call the data service. The console says blocked by CORS policy but curl works."}
+
+- {id: h01, split: held-out, runbook: 15, text: "Chrome keeps saying the page isn't redirecting properly."}
+- {id: h02, split: held-out, runbook: 15, text: "I sign in to expenses and it bounces me back to the start again and again, and clearing cookies made no difference."}
+- {id: h03, split: held-out, runbook: 1, text: "Single sign-on to the portal stopped for everybody at the same moment. The error mentions the certificate having expired."}
+- {id: h04, split: held-out, runbook: 2, text: "SSO fails and the message says the response has expired, but we only just clicked. The server clock might be off."}
+- {id: h05, split: held-out, runbook: 3, text: "Since we changed the address of the expenses app the sign-in screen shows an error before it even asks for a password."}
+- {id: h06, split: held-out, runbook: 4, text: "People say their password is wrong and it isn't. It's only staff in the directory, I can still use my admin account."}
+- {id: h07, split: held-out, runbook: 5, text: "VPN logins time out, but the same user can sign in to the portal fine."}
+- {id: h08, split: held-out, runbook: 6, text: "The page shows a 502 error although monitoring says the app is healthy."}
+- {id: h09, split: held-out, runbook: 7, text: "It waits about five seconds after the password and then gives an error, yet afterwards I find I am signed in."}
+- {id: h10, split: held-out, runbook: 8, text: "The gateway refuses us when lots of staff sign on at the same time."}
+- {id: h11, split: held-out, runbook: 9, text: "After signing in I get sent to the server's address without the port number."}
+- {id: h12, split: held-out, runbook: 18, text: "The partner connection says 'The SSL certificate error' since yesterday."}
+- {id: h13, split: held-out, runbook: 19, text: "Everything works in Postman but the browser just says Failed to fetch."}
+- {id: h14, split: held-out, runbook: 17, text: "The logon page shows a maintenance banner after the upgrade, even though the upgrade has finished."}
+- {id: h15, split: held-out, runbook: 16, text: "I can get in, but nothing loads. Every request to the data service is rejected."}
+- {id: h16, split: held-out, runbook: null, text: "I forgot my password, can you reset it please?"}
+- {id: h17, split: held-out, runbook: null, text: "The link in my favourites doesn't work any more. It says page not found."}
+- {id: h18, split: held-out, runbook: null, text: "The printer on the second floor is out of toner."}
+- {id: h19, split: held-out, runbook: null, text: "I typed my password wrong three times and now I am locked out. Caps lock was on."}
+
+# fresh: written after tuning on the two sets above, run once with no changes made afterwards
+- {id: f01, split: fresh, runbook: 15, text: "Our expenses site just sits there reloading itself and then the browser gives up."}
+- {id: f02, split: fresh, runbook: 1, text: "None of the Staff Portal logins have worked since 9am. It is all of us, and IT says nothing was touched."}
+- {id: f03, split: fresh, runbook: 14, text: "It broke after the redeploy but the code didn't change. The app log says name or service not known for the login server."}
+- {id: f04, split: fresh, runbook: 11, text: "The proxy now wants credentials and our app has none, so we get a 407."}
+- {id: f05, split: fresh, runbook: 3, text: "We moved expenses to a new URL and now sign in shows an error page."}
+- {id: f06, split: fresh, runbook: 13, text: "Since security started scanning HTTPS traffic our app rejects the login server's certificate."}
+- {id: f07, split: fresh, runbook: 10, text: "Sign-in gives a bad gateway for a handful of staff only, the same few every time."}
+- {id: f08, split: fresh, runbook: 8, text: "Login says 429 for everyone once the first few people got in this morning."}
+- {id: f09, split: fresh, runbook: null, text: "Can you add Priya from finance to the expenses approvers group?"}
+- {id: f10, split: fresh, runbook: null, text: "Why is my laptop so slow since the update?"}
+- {id: f11, split: fresh, runbook: 5, text: "Wi-Fi authentication on the third floor times out for everybody, although the controller's admin page works."}
+- {id: f12, split: fresh, runbook: 19, text: "Our dashboard shows a network error when loading data, but the endpoint answers when I test it directly with a script."}
+- {id: f13, split: fresh, runbook: 7, text: "After I enter my password the screen hangs for a bit and shows 504, but trying again a minute later works."}
+- {id: f14, split: fresh, runbook: 2, text: "Logins to the portal worked this morning but now say the assertion is too old although we only just clicked."}
