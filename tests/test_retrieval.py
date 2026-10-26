@@ -7,7 +7,7 @@ import yaml
 from triage.cli import build_retriever
 from triage.config import REPO_ROOT, load_config
 from triage.retrieval import Retriever, stem, terms, words
-from triage.runbooks import parse_runbook
+from triage.runbooks import load_runbooks, parse_runbook
 
 QUERIES = yaml.safe_load((REPO_ROOT / "tests" / "retrieval_queries.yaml").read_text())
 
@@ -92,17 +92,34 @@ def test_lab_error_text_is_strong_evidence(retriever):
 def test_scenario_log_patterns_hit_their_runbook(retriever):
     """Each SCENARIO_LOG pattern, matched against a real sample line from its own runbook."""
     lab = load_config(environ={}).lab_dir
-    checked = 0
+    checked, wrong = 0, []
     for scenario in retriever.scenarios.values():
-        if not scenario.log_pattern:
-            continue
         pattern = re.compile(scenario.log_pattern)
         sample = next((l for l in (lab / scenario.runbook).read_text().splitlines() if pattern.search(l)), None)
         if sample is None:
-            continue
+            continue  # clock-skew: its runbook shows no line that the lab's pattern matches
         checked += 1
-        assert retriever.search("something is wrong", sample).numbers[0] == scenario.runbook_number, scenario.name
-    assert checked >= 3
+        result = retriever.search("something is wrong", sample)
+        if not result.numbers or result.numbers[0] != scenario.runbook_number:
+            wrong.append(scenario.name)
+    assert checked >= 20
+    assert not wrong, wrong
+
+
+def test_the_event_rule_alone_finds_force_https():
+    """The 'event=' rule must keep working without the scenario patterns, so it has its own test.
+
+    The retriever here has no scenarios, so only the rule that ties a log line's event= name to
+    the runbooks describing it can supply the answer. Removing the rule fails this.
+    """
+    lab = load_config(environ={}).lab_dir
+    if not (lab / "runbooks").is_dir():
+        pytest.skip("identity-lab not found at LAB_DIR")
+    bare = Retriever(load_runbooks(lab), scenarios={})
+    line = "2026-10-22 08:44:57,240 INFO oidc-rp event=force_https path=/ scheme=http x_forwarded_proto=-"
+    result = bare.search("sign in is broken", line)
+    assert result.numbers[:1] == [15]
+    assert any("log event 'force_https'" in r for r in result.matches[0].reasons)
 
 
 def test_nothing_in_the_tickets_or_answers_folders_is_used():
