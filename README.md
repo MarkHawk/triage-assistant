@@ -2,7 +2,7 @@
 
 An AI support-triage assistant for [identity-lab](../identity-lab), a self-contained single sign-on lab that can be broken on purpose. It plays the IT support desk of a fictional company, Northgate Supplies, and works from the lab's runbooks.
 
-> **Status: work in progress.** Session 1 of the build is done: configuration, the secrets guard, the lab scenario reader and the repository checks. Triage itself arrives in later sessions.
+> **Status: work in progress.** Done so far: configuration, the secrets guard, the lab scenario reader, the repository checks, and runbook retrieval that works from plain language. The model backends, ticket mode, watch mode and the evals arrive in later sessions.
 
 Built with AI-assisted tooling (Claude Code).
 
@@ -23,6 +23,30 @@ python -m pytest
 ```
 
 `LAB_DIR` in `.env` points at identity-lab (default `../identity-lab`). The lab is only ever read.
+
+## Retrieval
+
+Only the best two or three runbooks go to the model. `python -m triage retrieve "it goes round in circles"` shows what a ticket would retrieve and why; add `--logs file` to include log lines.
+
+How it ranks, with no model and no network:
+
+1. BM25 over the runbooks' sections. The "how customers describe it" lines count most, so the runbooks' own customer language is searched.
+2. `data/phrases.yaml` maps everyday wording ("goes round in circles", "says something about a redirect") to runbooks. It also has hints for user-side causes (an old bookmark, a forgotten password), which stop keyword overlap alone from forcing a runbook.
+3. The lab's own error text and log patterns (`SCENARIO_EXPECT`, `SCENARIO_LOG`) and `event=` names in log lines count as strong evidence.
+
+A match is **strong** if it has any evidence beyond keywords, and **weak** otherwise. The prompt will say which, and no match at all is a proper result.
+
+### How well it works
+
+`tests/retrieval_queries.yaml` has 53 plain-language queries (including unrelated and user-side tickets that should match nothing). Counting a query as right if the expected runbook is in the top three, or nothing is returned when nothing fits:
+
+| Set | Queries | Plain keyword ranking | Phrases and evidence, first run | Now |
+|---|---|---|---|---|
+| dev (tuned on) | 20 | 17 | 20 | 20 |
+| held-out | 19 | 12 | 17 | 19 |
+| fresh | 14 | not run | 10 | 13 |
+
+Be careful reading the last column. After the first run I fixed what the failures showed (a keyword floor, a word-coverage check, a better stemmer and a few phrases), so the held-out and fresh sets are no longer independent evidence; the "first run" column is the fair one. The one known miss is an unrelated ticket ("Why is my laptop so slow since the update?") that gets weak keyword matches. It is marked weak, so the model is told they are only possibilities. Your ticket set is the real test; until then, `tests/test_retrieval.py` has floors so retrieval can't quietly get worse.
 
 ## Safety
 
