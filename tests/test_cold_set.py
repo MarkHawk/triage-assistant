@@ -19,6 +19,6 @@ def test_cold_set_is_unedited():
 
 def test_cold_set_is_well_formed():
     rows = yaml.safe_load(FILE.read_text())["cold"]
-    assert len(rows) == 23
-    assert sum(1 for r in rows if r["expect"]) == 18 and sum(1 for r in rows if not r["expect"]) == 5
+    assert len(rows) == 24
+    assert sum(1 for r in rows if r["expect"]) == 19 and sum(1 for r in rows if not r["expect"]) == 5
     assert all(set(r) <= {"q", "expect", "also_ok", "tests"} for r in rows)
