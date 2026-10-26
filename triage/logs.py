@@ -15,6 +15,19 @@ _INTERESTING = re.compile(
 )
 
 
+_DOCKER_STAMP = re.compile(r"^(?P<svc>\S+\s*\|\s)\d{4}-\d\d-\d\dT[\d:.]+Z (?P<rest>(\d{4}[-/]\d\d[-/]\d\d[ T]\d|\S+ - - \[\d\d/\w{3}/\d{4}).*)$")
+
+
+def tidy_logs(text: str) -> str:
+    """Drop Docker's own nanosecond timestamp where the line already carries one.
+
+    `docker compose logs --timestamps` prefixes every line; for most lab services the line then
+    repeats the time. The prefix is expensive to tokenise and says nothing new. Lines that have no
+    timestamp of their own (nginx's access log) keep it.
+    """
+    return "\n".join(_DOCKER_STAMP.sub(lambda m: m["svc"] + m["rest"], line) for line in text.splitlines())
+
+
 def collapse_repeats(lines: list[str]) -> list[str]:
     """Replace runs of identical lines (ignoring a leading timestamp) with one line and a count."""
     def key(line: str) -> str:

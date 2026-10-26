@@ -13,13 +13,18 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .config import REPO_ROOT
-from .logs import cap_logs
+from .logs import cap_logs, tidy_logs
 from .names import System
 from .retrieval import Match
 
-# Characters per token. Low numbers are cautious: logs and code tokenise badly.
+# Characters per token, each a little below what was measured on Qwen 2.5 14B (Ollama, 2026-10):
+# prose 4.2 or more, runbook extracts 3.44 at worst (of all 19), log lines 1.56. Log lines are far
+# the most expensive because timestamps and ids tokenise nearly one character at a time.
+# tests/test_logs_and_prompt.py fails if these rise above the measurements.
 PROSE_CHARS_PER_TOKEN = 3.0
-DENSE_CHARS_PER_TOKEN = 2.5
+RUNBOOK_CHARS_PER_TOKEN = 3.0
+LOG_CHARS_PER_TOKEN = 1.4
+MEASURED = {"prose": 4.29, "runbook": 3.44, "log": 1.56}
 OVERHEAD_TOKENS = 250  # the chat template and message framing
 
 _TAGS = re.compile(r"</?(ticket|logs|runbooks?|instructions|hints|system_note)\b[^>]*>", re.IGNORECASE)
@@ -63,8 +68,10 @@ class Prompt:
         return text
 
 
-def tokens(text: str, dense: bool = False) -> int:
-    return math.ceil(len(text) / (DENSE_CHARS_PER_TOKEN if dense else PROSE_CHARS_PER_TOKEN))
+def tokens(text: str, kind: str = "prose") -> int:
+    """Estimated tokens for text of a kind: "prose", "runbook" or "log"."""
+    ratio = {"prose": PROSE_CHARS_PER_TOKEN, "runbook": RUNBOOK_CHARS_PER_TOKEN, "log": LOG_CHARS_PER_TOKEN}[kind]
+    return math.ceil(len(text) / ratio)
 
 
 def neutralise(text: str) -> str:
@@ -81,13 +88,15 @@ def load_system(company: str, systems: dict[str, System], path: Path | None = No
 _DIAGNOSE = """Mode: DIAGNOSE. At least one runbook below is a strong match.
 - You may state the likely cause, in likely_cause, with the log lines that prove it in evidence.
 - Pick the outcome from the strong matches. Weak matches are only possibilities: do not base the answer on one.
-- Fill fix_steps from the runbook's Fix section, and the customer reply."""
+- Fill fix_steps with short plain steps based on the runbook's Fix section.
+- possibilities must be an empty list: they are only for clarify mode.
+- customer_reply: tell the customer, in plain words, what we think is wrong and what we are doing about it. Ask them to do something only if the runbook needs it."""
 
 _CLARIFY = """Mode: CLARIFY. No runbook below is a strong match, so nothing is established.
 - Do NOT state or imply a cause. likely_cause must be an empty string and fix_steps an empty list.
 - outcome must be "needs_more_info"{hint_clause}. confidence must be "low".
 - questions_for_customer: 3 to 6 questions that would tell the runbooks below apart or rule them out, drawn from their symptoms and "Questions I'd ask the customer".
-- possibilities: for each runbook that could apply, runbook_number and if_this, a condition the customer's answers would have to confirm. Never write them as findings.
+- possibilities: only for a runbook that could plausibly apply. Give runbook_number and if_this, a condition the customer's answers would have to confirm, written as a fragment that follows the word "If", for example "the page shows a 401 error". Never write a possibility as a finding ("The issue is ..."). If the ticket does not look like a sign-in, network login or web access problem (a printer, say), return an empty possibilities list and make the first question ask what they are trying to do.
 - customer_reply: thank them, ask the questions in plain words, say nothing about a cause."""
 
 
@@ -110,13 +119,13 @@ def build_prompt(system_text: str, mode: str, ticket_text: str, logs_text: str, 
         ticket = ticket[:ticket_chars].rsplit(" ", 1)[0] + " [... ticket cut to fit the prompt budget]"
         notes.append(f"The ticket was longer than the prompt budget and was cut to {len(ticket)} characters.")
 
-    log_chars = min(budget.max_log_chars, int(remaining * budget.log_share * DENSE_CHARS_PER_TOKEN))
-    logs, omitted = cap_logs(neutralise(logs_text), log_chars) if logs_text.strip() else ("", 0)
+    log_chars = min(budget.max_log_chars, int(remaining * budget.log_share * LOG_CHARS_PER_TOKEN))
+    logs, omitted = cap_logs(tidy_logs(neutralise(logs_text)), log_chars) if logs_text.strip() else ("", 0)
     if omitted:
         notes.append(f"{omitted} log lines were left out to fit the prompt budget; error-like lines were kept first.")
 
-    left_tokens = remaining - tokens(ticket) - tokens(logs, dense=True)
-    each = max(int(left_tokens * DENSE_CHARS_PER_TOKEN / max(len(shown), 1)), 0)
+    left_tokens = remaining - tokens(ticket) - tokens(logs, "log")
+    each = max(int(left_tokens * RUNBOOK_CHARS_PER_TOKEN / max(len(shown), 1)), 0)
     each = min(each, budget.max_excerpt_chars)
     blocks: list[str] = []
     for m in shown:
@@ -133,8 +142,8 @@ def build_prompt(system_text: str, mode: str, ticket_text: str, logs_text: str, 
     user = (f"{instructions}\n\n<ticket>\n{ticket}\n</ticket>{note_text}\n<logs>\n{log_block}\n</logs>{hint_text}\n"
             f"<runbooks>\n{runbooks_text}\n</runbooks>")
 
-    key = "\n--\n".join([ticket, logs, ",".join(f"{m.runbook.number}:{'s' if m.strong else 'w'}" for m in matches)])
+    key = "\n--\n".join([ticket_text.strip(), logs_text.strip(), ",".join(f"{m.runbook.number}:{'s' if m.strong else 'w'}" for m in matches)])
     estimate = (tokens(system_text) + tokens(instructions + hint_text + note_text) + tokens(ticket)
-                + tokens(log_block, dense=True) + tokens(runbooks_text, dense=True) + OVERHEAD_TOKENS + 40)
+                + tokens(log_block, "log") + tokens(runbooks_text, "runbook") + OVERHEAD_TOKENS + 40)
     return Prompt(system=system_text, user=user, mode=mode, untrusted=[ticket, logs],
                   trusted=[system_text, runbooks_text], key_material=key, notes=notes, parts_tokens=estimate)

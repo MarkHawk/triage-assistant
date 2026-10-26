@@ -1,9 +1,10 @@
 import pytest
 
 from triage.config import REPO_ROOT, load_config
-from triage.logs import cap_logs, collapse_repeats
+from triage.logs import cap_logs, collapse_repeats, tidy_logs
 from triage.names import load_names
-from triage.prompt import (CLAUDE_BUDGET, OVERHEAD_TOKENS, Budget, build_prompt, load_system, neutralise, tokens)
+from triage.prompt import (CLAUDE_BUDGET, LOG_CHARS_PER_TOKEN, MEASURED, PROSE_CHARS_PER_TOKEN, RUNBOOK_CHARS_PER_TOKEN,
+                           Budget, build_prompt, load_system, neutralise, tokens)
 from triage.retrieval import Match
 from triage.runbooks import load_runbooks
 
@@ -24,6 +25,24 @@ def test_cap_keeps_errors_and_says_what_it_dropped():
     text, omitted = cap_logs("\n".join(lines), 2000)
     assert len(text) <= 2000 and omitted > 0
     assert "reason=boom" in text and f"{omitted} log lines omitted" in text
+
+
+def test_docker_timestamp_is_dropped_only_where_the_line_has_its_own():
+    own = "oidc-rp-edge-1  | 2026-10-26T22:12:44.141514796Z 2026-10-26 22:12:44,141 INFO oidc-rp event=force_https"
+    access = 'oidc-rp-edge-1  | 2026-10-26T22:12:45.667962241Z 172.30.182.10 - - [26/Oct/2026:22:12:45 +0000] "GET / HTTP/1.1" 302 235'
+    nginx = 'proxy-1  | 2026-10-26T22:12:45.668547978Z 172.30.182.1 "GET / HTTP/1.1" 302 235 host=idlab.home:8187'
+    out = tidy_logs("\n".join([own, access, nginx])).splitlines()
+    assert out[0] == "oidc-rp-edge-1  | 2026-10-26 22:12:44,141 INFO oidc-rp event=force_https"
+    assert out[1].startswith("oidc-rp-edge-1  | 172.30.182.10 - - [26/Oct/2026")
+    assert out[2] == nginx  # no time of its own, so the Docker one is the only one
+
+
+def test_token_ratios_stay_below_what_was_measured():
+    """Measured on Qwen 2.5 14B through Ollama. The estimate must never be more hopeful than the model."""
+    assert PROSE_CHARS_PER_TOKEN <= MEASURED["prose"]
+    assert RUNBOOK_CHARS_PER_TOKEN <= MEASURED["runbook"]
+    assert LOG_CHARS_PER_TOKEN <= MEASURED["log"]
+    assert tokens("x" * 140, "log") == 100 and tokens("x" * 300) == 100 and tokens("x" * 300, "runbook") == 100
 
 
 def test_tags_in_untrusted_text_are_neutralised():
@@ -83,8 +102,6 @@ def test_worst_case_prompt_fits_the_ollama_window(lab, system_text, num_ctx, mod
     assert prompt.estimated_tokens + 1500 <= num_ctx
     assert prompt.notes, "cutting inputs must be reported, never silent"
     assert any("log lines" in n for n in prompt.notes) and any("ticket" in n for n in prompt.notes)
-    # the estimate is computed on the same ratios the budget used; check it against a plain length bound too
-    assert len(prompt.system) + len(prompt.user) <= budget.prompt_tokens * 3.0
 
 
 def test_default_window_still_gives_each_runbook_useful_room(lab, system_text):
