@@ -92,6 +92,25 @@ Cases where a model got the scenario wrong have no recording. See [docs/live-run
 
 **Claude** uses structured output (not a forced tool choice, which Claude Sonnet 5.5 rejects). If the API declines a request it can re-run it on a fallback model (`CLAUDE_REFUSAL_FALLBACK=1`, the default).
 
+## Real-ticket evaluation
+
+You write the tickets; the runner scores what the assistant does with them.
+
+1. Copy `tests/real_tickets.template.yaml` to `tests/real_tickets.yaml` and write about 20 tickets in it. For each, give the ticket text and the runbook a good engineer would open first (or `null` if none fits, such as a password reset). Use fictional names only.
+2. Run it: `python -m evals.real_tickets` (defaults: Ollama, `qwen2.5:14b`, window 12288). Each ticket is triaged once, with **ticket text only and no logs**.
+3. Open the report in `results/`. It gives the table below and then every answer in full, so you can judge the draft replies:
+
+| Column | Meaning |
+|---|---|
+| Retrieval right | the expected runbook was in the top three retrieved (or, if none was expected, nothing matched strongly) |
+| Mode appropriate | diagnose or clarify, against the mode you expected |
+| Cause right | in diagnose mode, the scenario named belongs to the expected runbook. In clarify mode no cause is asserted, so it shows n/a |
+| Send-ready | **left blank for you**: yes / with edits / no |
+
+4. Fill in the last column, then `python -m evals.real_tickets --summarise results/<report>.md` counts your verdicts and breaks them down by whether retrieval, mode and cause were right.
+
+**Do not tune retrieval, phrases or prompts against these tickets before the first review.** The ticket file's hash is recorded in each report so a later edit is visible.
+
 ## Safety
 
 - A value from the lab's own `.env` is a hard refusal anywhere: nothing is sent to a model.
