@@ -48,7 +48,8 @@ def output_schema(scenario_names: list[str]) -> dict:
             "questions_for_customer": text_list,
             "possibilities": {"type": "array", "items": {
                 "type": "object", "additionalProperties": False, "required": ["runbook_number", "if_this"],
-                "properties": {"runbook_number": {"type": "integer"}, "if_this": {"type": "string"}}}},
+                "properties": {"runbook_number": {"type": "integer"},
+                               "if_this": {"type": "string", "description": "A condition, as a fragment that follows the word If."}}}},
         },
     }
 
@@ -164,13 +165,28 @@ def check(raw: dict, ctx: Context) -> tuple[Answer, list[str]]:
         possibilities=possibilities, warnings=warnings,
     )
 
+    strip_placeholders(answer)
     violations: list[str] = []
     if ctx.mode == "clarify":
         violations = clarify_violations(answer, ctx)
     else:
+        if answer.possibilities:
+            answer.possibilities = []
+            answer.warnings.append("Possibilities were dropped: they belong to clarify mode only.")
         _correct_diagnosis(answer, ctx)
     add_secrets_advice(answer, ctx.ticket_was_flagged)
     return answer, violations
+
+
+_PLACEHOLDER = re.compile(r"\[(?:your|customer|client|user|name|insert|company|engineer|support)[^\]\n]{0,30}\]", re.IGNORECASE)
+
+
+def strip_placeholders(answer: Answer) -> None:
+    """Remove template placeholders such as [Your Name] from the reply, and say so."""
+    if _PLACEHOLDER.search(answer.customer_reply):
+        cleaned = _PLACEHOLDER.sub("", answer.customer_reply)
+        answer.customer_reply = re.sub(r"\n{3,}", "\n\n", re.sub(r"[ \t]+\n", "\n", cleaned)).strip()
+        answer.warnings.append("A placeholder such as [Your Name] was removed from the reply.")
 
 
 def clarify_violations(answer: Answer, ctx: Context) -> list[str]:
@@ -190,9 +206,14 @@ def clarify_violations(answer: Answer, ctx: Context) -> list[str]:
         problems.append("confidence must be low")
     if not answer.questions_for_customer:
         problems.append("ask at least one clarifying question")
-    texts = [answer.customer_reply, *answer.questions_for_customer, *(p.if_this for p in answer.possibilities)]
-    if any(_ASSERTS.search(t) for t in texts):
-        problems.append("do not state or imply a cause; mention runbooks only as conditional possibilities")
+    places = [("customer_reply", answer.customer_reply), *(("a question", q) for q in answer.questions_for_customer),
+              *((f"the possibility for runbook {p.runbook_number}", p.if_this) for p in answer.possibilities)]
+    for where, text in places:
+        hit = _ASSERTS.search(text)
+        if hit:
+            snippet = text[max(0, hit.start() - 20): hit.end() + 40].replace("\n", " ")
+            problems.append(f'{where} says "{snippet}", which states a cause. A possibility must be a condition after the word '
+                            '"If", such as "the page shows a 401 error"')
     return problems
 
 

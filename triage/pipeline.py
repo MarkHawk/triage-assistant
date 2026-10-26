@@ -62,13 +62,12 @@ def run_triage(ticket_text: str, logs_text: str, *, backend: Backend, retriever:
     ctx = ans.Context(mode=mode, logs=logs_text, ticket=masked.text, scenario_runbooks=scenario_runbooks,
                       retrieved=retrieved, user_side_hint=bool(result.hints), ticket_was_flagged=masked.flagged)
 
-    if mode == "clarify" and backend.offline:
+    prompt = build_prompt(system_text, mode, masked.text, logs_text, list(result.matches), result.hints,
+                          masked.model_note, backend.budget)
+    if mode == "clarify" and backend.offline and not backend.can_replay(prompt):
         offline = build_clarify_answer(list(result.matches), result.hints)
         ans.add_secrets_advice(offline, masked.flagged)
         return Triage(offline, mode, result, flags)
-
-    prompt = build_prompt(system_text, mode, masked.text, logs_text, list(result.matches), result.hints,
-                          masked.model_note, backend.budget)
     schema = ans.output_schema(list(scenario_runbooks))
     flags += prompt.notes
 

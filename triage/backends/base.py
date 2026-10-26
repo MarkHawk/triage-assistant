@@ -32,6 +32,10 @@ class Backend:
         self.budget = budget
         self.last_stats: dict = {}  # what the server reported about the last request, for the run footer
 
+    def can_replay(self, prompt: Prompt) -> bool:
+        """True if an offline backend has a saved answer for this request."""
+        return False
+
     def complete(self, prompt: Prompt, schema: dict) -> dict:
         """Check the whole prompt for secrets, then ask the model. Raises SecretFound before sending."""
         self.guard.check_outbound(untrusted=prompt.untrusted, trusted=[*prompt.trusted, prompt.system, prompt.user_trusted_check()])

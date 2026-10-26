@@ -33,6 +33,9 @@ class DemoBackend(Backend):
         super().__init__(guard, budget)
         self.directory = directory
 
+    def can_replay(self, prompt: Prompt) -> bool:
+        return (self.directory / f"{key_for(prompt)}.json").is_file()
+
     def _complete(self, prompt: Prompt, schema: dict) -> dict:
         path = self.directory / f"{key_for(prompt)}.json"
         if not path.is_file():

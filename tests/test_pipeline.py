@@ -260,3 +260,16 @@ def test_mode_is_decided_from_strength_not_from_having_matches(world):
     assert decide_mode(world["retriever"].search(QUERY_15)) == "clarify"
     assert decide_mode(world["retriever"].search("Users see: Could not validate timestamp: expired. Check system clock.")) == "diagnose"
     assert decide_mode(world["retriever"].search(PRINTER)) == "clarify"
+
+
+def test_clarify_mode_replays_a_recorded_model_answer_when_demo_has_one(world, tmp_path):
+    demo = DemoBackend(world["guard"], CLAUDE_BUDGET, directory=tmp_path)
+    first = triage(world, QUERY_15, backend=demo)
+    assert first.answer.source == "offline"  # nothing recorded yet: built by code
+    recorded = {**CLARIFY_GOOD, "customer_reply": "Which address do you use? We will look into it."}
+    live = Scripted(world["guard"], [recorded])
+    result = triage(world, QUERY_15, backend=live)
+    demo.record(result.prompt, result.raw, "scripted", "test")
+    replayed = triage(world, QUERY_15, backend=demo)
+    assert replayed.answer.source == "model" and replayed.answer.customer_reply.startswith("Which address do you use?")
+    assert replayed.answer.questions_for_customer == ["Which address do you use?"]

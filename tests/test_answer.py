@@ -136,3 +136,25 @@ def test_render_diagnosis_has_cause_evidence_runbook_and_steps():
     text = render(check(raw(), ctx())[0])
     for part in ("### Likely cause", "### Evidence", "### Runbook", "### Fix steps", "### Draft reply"):
         assert part in text
+
+
+def test_placeholders_in_the_reply_are_removed_and_reported():
+    reply = "We are on it.\n\nBest regards,\n[Your Name]"
+    for mode, base in (("diagnose", raw(customer_reply=reply)), ("clarify", {**CLARIFY_OK, "customer_reply": reply})):
+        answer, violations = check(base, ctx(mode))
+        assert "[Your Name]" not in answer.customer_reply and answer.customer_reply.endswith("Best regards,")
+        assert any("placeholder" in w for w in answer.warnings) and not any("placeholder" in v for v in violations)
+    kept, _ = check(raw(customer_reply="Your token shows as [MASKED:jwt]."), ctx())
+    assert "[MASKED:jwt]" in kept.customer_reply  # the guard's own markers are not placeholders
+
+
+def test_possibilities_are_dropped_in_diagnose_mode():
+    answer, _ = check(raw(possibilities=[{"runbook_number": 15, "if_this": "the page loops"}]), ctx())
+    assert answer.possibilities == [] and any("clarify mode only" in w for w in answer.warnings)
+
+
+def test_a_possibility_written_as_a_finding_is_named_in_the_violation():
+    bad = {**CLARIFY_OK, "possibilities": [{"runbook_number": 15, "if_this": "The issue is related to a redirect loop."}]}
+    _, violations = check(bad, ctx("clarify"))
+    assert len(violations) == 1
+    assert "runbook 15" in violations[0] and "The issue is" in violations[0] and 'after the word "If"' in violations[0]

@@ -218,3 +218,25 @@ def test_demo_records_and_replays_and_keys_ignore_prompt_wording(tmp_path):
     reworded.system = "a different system prompt"
     assert key_for(reworded) == key_for(p) and demo.complete(reworded, SCHEMA) == ANSWER
     assert key_for(prompt(key="another ticket")) != key_for(p)
+
+
+def test_recording_replays_whatever_the_budget_was(tmp_path):
+    """A recording made with a small Ollama window must replay under demo mode's larger budget."""
+    from triage.prompt import build_prompt
+    from triage.retrieval import Match
+    from triage.runbooks import Runbook
+
+    book = Runbook(15, "Redirect loop", "runbooks/15-x.md", {}, {"Symptom": "s " * 3000, "Fix": "f"})
+    match = Match(book, 1.0, ("matches how customers describe it",))
+    long_logs = "\n".join(f"line {i} " + "x" * 80 for i in range(400))
+    small = build_prompt("sys", "diagnose", "ticket", long_logs, [match], (), "", Budget(prompt_tokens=3000))
+    large = build_prompt("sys", "diagnose", "ticket", long_logs, [match], (), "", CLAUDE_BUDGET)
+    assert small.user != large.user and key_for(small) == key_for(large)
+
+
+def test_an_offline_backend_only_replays_what_it_has(tmp_path):
+    demo = DemoBackend(Guard(), CLAUDE_BUDGET, directory=tmp_path)
+    p = prompt(key="k1")
+    assert demo.can_replay(p) is False
+    demo.record(p, ANSWER, "ollama", "m")
+    assert demo.can_replay(p) is True and ClaudeBackend(Guard(), CLAUDE_BUDGET, "k", "m", client=FakeClient(reply())).can_replay(p) is False
