@@ -2,7 +2,7 @@
 
 An AI support-triage assistant for [identity-lab](../identity-lab), a self-contained single sign-on lab that can be broken on purpose. It plays the IT support desk of a fictional company, Northgate Supplies, and works from the lab's runbooks.
 
-> **Status: work in progress.** Done so far: configuration, the secrets guard, the lab scenario reader, the repository checks, runbook retrieval that works from plain language, and ticket mode with Claude, Ollama and demo backends. Watch mode and the evals arrive in later sessions. The Claude and Ollama backends are tested against fakes only: no live model has been called yet.
+> **Status: work in progress.** Done so far: configuration, the secrets guard, the lab scenario reader, the repository checks, runbook retrieval that works from plain language, and ticket mode with Claude, Ollama and demo backends. Watch mode and the evals arrive in later sessions. The Ollama backend has been run live on two Qwen 2.5 14B models (see `docs/live-runs-ollama.md`); the Claude backend is tested against a fake client only.
 
 Built with AI-assisted tooling (Claude Code).
 
@@ -77,7 +77,7 @@ A ticket file is the customer's message, with an optional `## Log excerpt` secti
 
 Whatever a model returns is checked before you see it: quoted evidence that is not in the supplied text is dropped, the runbook is derived from the outcome rather than taken from the model, and confidence is capped when the evidence is thin.
 
-**Demo mode** (`BACKEND=demo`, the default) needs no key and no GPU. Clarify answers are built by code. Diagnose answers are replayed from `demo/answers/`, saved by `--record` after a real run, and keyed by the ticket, the logs and the retrieved runbooks, so changing the prompt does not orphan them. None are saved yet.
+**Demo mode** (`BACKEND=demo`, the default) needs no key and no GPU. Clarify answers are built by code. Diagnose answers are replayed from `demo/answers/`, saved by `--record` after a real run, and keyed by the ticket, the logs and the retrieved runbooks, so changing the prompt does not orphan them. Two are saved in `demo/answers/`, with their fixtures in `demo/fixtures/`.
 
 **Claude** uses structured output (not a forced tool choice, which Claude Sonnet 5.5 rejects). If the API declines a request it can re-run it on a fallback model (`CLAUDE_REFUSAL_FALLBACK=1`, the default).
 
@@ -106,7 +106,7 @@ The worst case is tested: three of the longest runbooks, a 60 KB log snapshot an
 | 12288 | about 3,400 characters | about 10,200 tokens |
 | 16384 | about 5,000 to 5,700 characters | about 13,900 tokens |
 
-Whether a given 14B model fits 12288 or 16384 on a 16 GB card depends on its quantisation, so check VRAM before raising it. To run Ollama on a different machine, such as a Windows PC with a GPU, see [docs/ollama-on-another-machine.md](docs/ollama-on-another-machine.md).
+Whether a given 14B model fits 12288 or 16384 on a 16 GB card depends on its quantisation, so check VRAM before raising it. To run Ollama on a different machine, such as a Windows PC with a GPU, see [docs/ollama-on-another-machine.md](docs/ollama-on-another-machine.md). What a real run measured, including a correction to the token estimate, is in [docs/live-runs-ollama.md](docs/live-runs-ollama.md).
 
 ## Latest scores
 
