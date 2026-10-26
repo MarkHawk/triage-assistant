@@ -77,7 +77,18 @@ A ticket file is the customer's message, with an optional `## Log excerpt` secti
 
 Whatever a model returns is checked before you see it: quoted evidence that is not in the supplied text is dropped, the runbook is derived from the outcome rather than taken from the model, and confidence is capped when the evidence is thin.
 
-**Demo mode** (`BACKEND=demo`, the default) needs no key and no GPU. Clarify answers are built by code. Diagnose answers are replayed from `demo/answers/`, saved by `--record` after a real run, and keyed by the ticket, the logs and the retrieved runbooks, so changing the prompt does not orphan them. Two are saved in `demo/answers/`, with their fixtures in `demo/fixtures/`.
+**Demo mode** (`BACKEND=demo`, the default) needs no key and no GPU. Clarify answers are built by code. Diagnose answers are replayed from `demo/answers/`, saved by `--record` after a real run, and keyed by the ticket, the logs and the retrieved runbooks, so changing the prompt does not orphan them. Four are saved in `demo/answers/`, with their fixtures in `demo/fixtures/`.
+
+**The demo recordings are the best run per case, not a typical run.** Each is the best of six live runs (three on each of two models, window 12288), chosen for: right answer, no retry, most quoted evidence verified, nothing corrected, then fastest. The model is named in each recording's metadata:
+
+| Case | Recorded from |
+|---|---|
+| `redirect-loop` (diagnose) | `qwen2.5:14b` |
+| `cors-blocked` (diagnose) | `qwen2.5:14b` |
+| `expired-signing-cert` (diagnose) | `qwen2.5-coder:14b` |
+| printer offline (clarify) | `qwen2.5:14b` |
+
+Cases where a model got the scenario wrong have no recording. See [docs/live-runs-ollama.md](docs/live-runs-ollama.md) for all 42 runs.
 
 **Claude** uses structured output (not a forced tool choice, which Claude Sonnet 5.5 rejects). If the API declines a request it can re-run it on a fallback model (`CLAUDE_REFUSAL_FALLBACK=1`, the default).
 

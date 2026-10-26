@@ -42,7 +42,7 @@ Then, in `.env`:
 ```
 BACKEND=ollama
 OLLAMA_HOST=http://ollama-pc.lan:11434
-OLLAMA_MODEL=qwen2.5-coder:14b
+OLLAMA_MODEL=qwen2.5:14b
 OLLAMA_NUM_CTX=12288
 ```
 
