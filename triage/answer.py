@@ -83,6 +83,7 @@ class Answer:
     possibilities: list[Possibility]
     warnings: list[str] = field(default_factory=list)
     source: str = "model"  # "model" or "offline" (built by code, no model)
+    dropped_evidence: list[str] = field(default_factory=list)  # quoted lines that could not be verified
 
     @property
     def asserts_cause(self) -> bool:
@@ -136,6 +137,7 @@ def check(raw: dict, ctx: Context) -> tuple[Answer, list[str]]:
     warnings: list[str] = []
     full_logs, full_ticket = _squash(ctx.logs), _squash(ctx.ticket)
     evidence: list[Evidence] = []
+    dropped: list[str] = []
     for item in raw.get("evidence") or []:
         line, why = _clean(item.get("line")), _clean(item.get("why"))
         if not line:
@@ -145,7 +147,7 @@ def check(raw: dict, ctx: Context) -> tuple[Answer, list[str]]:
         elif _squash(line) in full_ticket:
             evidence.append(Evidence(line, why, "ticket"))
         else:
-            warnings.append("A quoted line was dropped because it does not appear in the supplied text.")
+            dropped.append(line)
 
     possibilities: list[Possibility] = []
     for item in raw.get("possibilities") or []:
@@ -162,7 +164,7 @@ def check(raw: dict, ctx: Context) -> tuple[Answer, list[str]]:
         runbook=ctx.scenario_runbooks.get(outcome), fix_steps=_strings(raw.get("fix_steps")),
         customer_reply=_clean(raw.get("customer_reply")),
         questions_for_customer=_strings(raw.get("questions_for_customer")),
-        possibilities=possibilities, warnings=warnings,
+        possibilities=possibilities, warnings=warnings, dropped_evidence=dropped,
     )
 
     strip_placeholders(answer)
@@ -170,6 +172,7 @@ def check(raw: dict, ctx: Context) -> tuple[Answer, list[str]]:
     if ctx.mode == "clarify":
         violations = clarify_violations(answer, ctx)
     else:
+        violations = contradictions(answer, ctx)
         if answer.possibilities:
             answer.possibilities = []
             answer.warnings.append("Possibilities were dropped: they belong to clarify mode only.")
@@ -187,6 +190,21 @@ def strip_placeholders(answer: Answer) -> None:
         cleaned = _PLACEHOLDER.sub("", answer.customer_reply)
         answer.customer_reply = re.sub(r"\n{3,}", "\n\n", re.sub(r"[ \t]+\n", "\n", cleaned)).strip()
         answer.warnings.append("A placeholder such as [Your Name] was removed from the reply.")
+
+
+CONTRADICTION = "CONTRADICTION:"
+
+
+def contradictions(answer: Answer, ctx: Context) -> list[str]:
+    """An answer that says "not a lab fault" while giving a cause and verified evidence for a runbook that
+    matched strongly argues against itself. A model once did this nine times in nine, with high confidence."""
+    strong = [n for n, (_, _, is_strong) in ctx.retrieved.items() if is_strong]
+    if (answer.outcome == "not_a_lab_fault" and answer.asserts_cause and answer.evidence
+            and strong and not ctx.user_side_hint):
+        return [f"{CONTRADICTION} the outcome is not_a_lab_fault, but you also gave a cause and quoted evidence, and "
+                f"runbook {strong[0]:02d} matched strongly. If that runbook fits, set the outcome to its scenario name. "
+                "If this really is not a lab fault, remove the cause and the evidence and say why"]
+    return []
 
 
 def clarify_violations(answer: Answer, ctx: Context) -> list[str]:
@@ -285,8 +303,13 @@ def render(answer: Answer, flags: list[str] | None = None) -> str:
         out.append("")
     out.append("### Draft reply to the customer")
     out.append(answer.customer_reply)
-    if answer.warnings:
+    if answer.warnings or answer.dropped_evidence:
         out.append("")
-        out.append("### Notes")
+        out.append("### For the engineer (not for the customer)")
         out.extend(f"- {w}" for w in dict.fromkeys(answer.warnings))
+        if answer.dropped_evidence:
+            n = len(answer.dropped_evidence)
+            out.append(f"- {n} quoted line{'s were' if n != 1 else ' was'} not found word for word in the supplied text, "
+                       f"so {'they were' if n != 1 else 'it was'} dropped from the evidence above. Treat {'them' if n != 1 else 'it'} as unverified:")
+            out.extend(f"  - `{line[:300]}{'...' if len(line) > 300 else ''}`" for line in answer.dropped_evidence)
     return "\n".join(out).rstrip() + "\n"

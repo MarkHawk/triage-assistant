@@ -85,6 +85,14 @@ def run_triage(ticket_text: str, logs_text: str, *, backend: Backend, retriever:
         if not violations:
             return Triage(answer, mode, result, flags, prompt, raw, attempts, False, dict(backend.last_stats))
         feedback = "Your previous reply broke these rules, so it was discarded: " + "; ".join(violations) + ". Reply again."
+    if (mode == "diagnose" and answer is not None
+            and all(v.startswith(ans.CONTRADICTION) for v in violations)):  # retried once; keep it, but say so
+        answer.confidence = "low"
+        answer.warnings.insert(0, "The answer contradicts itself and the model did not resolve it when asked: "
+                                  + violations[0].removeprefix(ans.CONTRADICTION).strip())
+        flags.append("WARNING: this answer contradicts itself (the outcome says not a lab fault, but it gives a cause and "
+                     "evidence for a runbook that matched strongly). Confidence was capped at low. Read it with care.")
+        return Triage(answer, mode, result, flags, prompt, raw, attempts, False, dict(backend.last_stats))
     if mode == "clarify":  # the model keeps asserting; code builds a safe answer instead
         fallback = build_clarify_answer(list(result.matches), result.hints)
         ans.add_secrets_advice(fallback, masked.flagged)

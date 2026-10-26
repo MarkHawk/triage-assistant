@@ -42,7 +42,7 @@ def test_model_cannot_choose_the_runbook_path():
 def test_invented_evidence_is_dropped_and_confidence_capped():
     answer, _ = check(raw(evidence=[{"line": "event=made_up_line", "why": "x"}]), ctx())
     assert answer.evidence == [] and answer.confidence == "medium"
-    assert any("dropped" in w for w in answer.warnings)
+    assert answer.dropped_evidence == ["event=made_up_line"]
 
 
 def test_evidence_may_quote_the_ticket():
@@ -158,3 +158,39 @@ def test_a_possibility_written_as_a_finding_is_named_in_the_violation():
     _, violations = check(bad, ctx("clarify"))
     assert len(violations) == 1
     assert "runbook 15" in violations[0] and "The issue is" in violations[0] and 'after the word "If"' in violations[0]
+
+
+def test_dropped_evidence_is_shown_to_the_engineer_with_its_count_and_text():
+    answer, _ = check(raw(evidence=[{"line": LOGS, "why": "ok"}, {"line": "event=made_up_line", "why": "x"},
+                                    {"line": "another invented line " + "z" * 400, "why": "y"}]), ctx())
+    text = render(answer)
+    section = text.split("### For the engineer")[1]
+    assert "2 quoted lines were not found word for word" in section and "Treat them as unverified" in section
+    assert "`event=made_up_line`" in section and "z" * 100 in section and "..." in section  # long ones are cut
+    one, _ = check(raw(evidence=[{"line": LOGS, "why": "ok"}, {"line": "event=made_up_line", "why": "x"}]), ctx())
+    assert "1 quoted line was not found" in render(one) and "Treat it as unverified" in render(one)
+    clean, _ = check(raw(), ctx())
+    assert "For the engineer" not in render(clean)
+
+
+CONTRADICTORY = raw(outcome="not_a_lab_fault")
+
+
+def test_not_a_lab_fault_with_a_cause_and_evidence_for_a_strong_runbook_is_a_contradiction():
+    _, violations = check(CONTRADICTORY, ctx())
+    assert len(violations) == 1 and violations[0].startswith("CONTRADICTION:") and "runbook 15" in violations[0]
+
+
+@pytest.mark.parametrize("change", [
+    {"evidence": []},                 # no verified evidence
+    {"likely_cause": ""},             # no cause stated
+    {"outcome": "redirect-loop"},     # not the contradictory outcome
+])
+def test_the_contradiction_check_needs_all_of_its_conditions(change):
+    assert check({**CONTRADICTORY, **change}, ctx())[1] == []
+
+
+def test_the_contradiction_check_stands_down_when_no_runbook_matched_strongly_or_a_user_side_hint_applies():
+    weak = {15: ("runbooks/15-redirect-loop.md", "Redirect loop", False)}
+    assert check(CONTRADICTORY, ctx(retrieved=weak))[1] == []
+    assert check(CONTRADICTORY, ctx(user_side_hint=True))[1] == []

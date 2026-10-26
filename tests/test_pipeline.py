@@ -284,3 +284,25 @@ def test_a_quote_from_the_tidied_logs_the_model_saw_is_accepted(world):
     assert [e.line for e in result.answer.evidence] == [seen_by_the_model]
     invented = {**DIAGNOSIS, "evidence": [{"line": "oidc-rp-edge-1  | 2026-10-26 22:12:44,141 INFO oidc-rp event=nothing", "why": "x"}]}
     assert triage(world, "The portal goes round in circles", docker_line, Scripted(world["guard"], [invented])).answer.evidence == []
+
+
+CONTRADICTION = {**DIAGNOSIS, "outcome": "not_a_lab_fault"}
+
+
+def test_a_self_contradicting_answer_is_sent_back_once_and_the_fixed_one_is_used(world):
+    backend = Scripted(world["guard"], [CONTRADICTION, DIAGNOSIS])
+    result = triage(world, "The portal goes round in circles", LOOP_LOG, backend)
+    assert result.attempts == 2 and result.answer.outcome == "redirect-loop" and result.answer.confidence == "high"
+    assert "CONTRADICTION" in backend.prompts[1].user and "runbook 15" in backend.prompts[1].user
+    assert not any("contradicts" in f for f in result.flags)
+
+
+def test_a_contradiction_that_survives_the_retry_is_kept_but_capped_and_flagged(world):
+    backend = Scripted(world["guard"], [CONTRADICTION, CONTRADICTION])
+    result = triage(world, "The portal goes round in circles", LOOP_LOG, backend)
+    assert result.attempts == 2 and not result.code_fallback
+    assert result.answer.outcome == "not_a_lab_fault" and result.answer.confidence == "low"
+    assert any("contradicts itself" in f and "capped at low" in f for f in result.flags)
+    assert result.answer.warnings[0].startswith("The answer contradicts itself")
+    from triage.answer import render
+    assert render(result.answer, result.flags).startswith("> WARNING: this answer contradicts itself")
