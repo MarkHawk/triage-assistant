@@ -273,3 +273,14 @@ def test_clarify_mode_replays_a_recorded_model_answer_when_demo_has_one(world, t
     replayed = triage(world, QUERY_15, backend=demo)
     assert replayed.answer.source == "model" and replayed.answer.customer_reply.startswith("Which address do you use?")
     assert replayed.answer.questions_for_customer == ["Which address do you use?"]
+
+
+def test_a_quote_from_the_tidied_logs_the_model_saw_is_accepted(world):
+    docker_line = ("oidc-rp-edge-1  | 2026-10-26T22:12:44.141514796Z 2026-10-26 22:12:44,141 INFO oidc-rp "
+                   "event=force_https path=/ scheme=http x_forwarded_proto=-")
+    seen_by_the_model = "oidc-rp-edge-1  | 2026-10-26 22:12:44,141 INFO oidc-rp event=force_https path=/ scheme=http x_forwarded_proto=-"
+    quoted = {**DIAGNOSIS, "evidence": [{"line": seen_by_the_model, "why": "the app sees plain HTTP"}]}
+    result = triage(world, "The portal goes round in circles", docker_line, Scripted(world["guard"], [quoted]))
+    assert [e.line for e in result.answer.evidence] == [seen_by_the_model]
+    invented = {**DIAGNOSIS, "evidence": [{"line": "oidc-rp-edge-1  | 2026-10-26 22:12:44,141 INFO oidc-rp event=nothing", "why": "x"}]}
+    assert triage(world, "The portal goes round in circles", docker_line, Scripted(world["guard"], [invented])).answer.evidence == []

@@ -16,6 +16,7 @@ from . import answer as ans
 from .backends.base import Backend, BackendError
 from .clarify import build_clarify_answer
 from .guard import Guard
+from .logs import tidy_logs
 from .prompt import Prompt, build_prompt
 from .retrieval import Result, Retriever
 from .scenarios import Scenario
@@ -59,7 +60,8 @@ def run_triage(ticket_text: str, logs_text: str, *, backend: Backend, retriever:
     mode = decide_mode(result)
     scenario_runbooks = {name: s.runbook for name, s in scenarios.items()}
     retrieved = {m.runbook.number: (m.runbook.path, m.runbook.title, m.strong) for m in result.matches}
-    ctx = ans.Context(mode=mode, logs=logs_text, ticket=masked.text, scenario_runbooks=scenario_runbooks,
+    # A quote may come from the logs as the model saw them (tidied) or as supplied.
+    ctx = ans.Context(mode=mode, logs=logs_text + "\n" + tidy_logs(logs_text), ticket=masked.text, scenario_runbooks=scenario_runbooks,
                       retrieved=retrieved, user_side_hint=bool(result.hints), ticket_was_flagged=masked.flagged)
 
     prompt = build_prompt(system_text, mode, masked.text, logs_text, list(result.matches), result.hints,
