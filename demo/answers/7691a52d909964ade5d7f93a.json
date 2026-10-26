@@ -1,0 +1,31 @@
+{
+  "meta": {
+    "recorded": "2026-10-26",
+    "backend": "ollama",
+    "model": "qwen2.5:14b"
+  },
+  "answer": {
+    "outcome": "redirect-loop",
+    "confidence": "high",
+    "likely_cause": "The Northgate Expenses app is experiencing a redirect loop due to missing or incorrect `X-Forwarded-Proto` headers.",
+    "evidence": [
+      {
+        "line": "2026-10-26 22:12:44,141 INFO oidc-rp event=force_https path=/ scheme=http x_forwarded_proto=-",
+        "why": "The app is forcing HTTPS but is receiving an HTTP request, indicated by `scheme=http` and `x_forwarded_proto=-`."
+      },
+      {
+        "line": "172.30.182.10 - - [26/Oct/2026:22:12:45 +0000] \"GET / HTTP/1.1\" 302 235 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36\"",
+        "why": "The app is responding with a 302 redirect, indicating a loop."
+      }
+    ],
+    "fix_steps": [
+      "Check the nginx configuration for the location block serving the Northgate Expenses app.",
+      "Ensure that the `proxy_set_header X-Forwarded-Proto $scheme` directive is present and correctly configured.",
+      "If necessary, add the missing `proxy_set_header` directives to the location block.",
+      "Run `nginx -t` to test the configuration and `nginx -s reload` to apply the changes."
+    ],
+    "customer_reply": "We have identified that the Northgate Expenses app is experiencing a redirect loop due to missing or incorrect headers. We are working to correct the configuration and will update you shortly.",
+    "questions_for_customer": [],
+    "possibilities": []
+  }
+}

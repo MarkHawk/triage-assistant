@@ -1,0 +1,24 @@
+{
+  "meta": {
+    "recorded": "2026-10-26",
+    "backend": "ollama",
+    "model": "qwen2.5-coder:14b"
+  },
+  "answer": {
+    "outcome": "needs_more_info",
+    "confidence": "low",
+    "likely_cause": "",
+    "evidence": [],
+    "fix_steps": [],
+    "customer_reply": "Thank you for your message. To help us resolve the issue with the printer on the second floor, could you please provide the following information:\n\n1. What exactly does the printer show as offline? Is there an error message or code?\n2. Have you tried restarting the printer or the computer it's connected to?\n3. Is the printer connected via a wired or wireless connection?\n4. Have there been any recent changes to the network or printer settings?\n5. Can you access the printer's web interface or control panel?\n6. Are there any other printers on the network that are working correctly?",
+    "questions_for_customer": [
+      "What exactly does the printer show as offline? Is there an error message or code?",
+      "Have you tried restarting the printer or the computer it's connected to?",
+      "Is the printer connected via a wired or wireless connection?",
+      "Have there been any recent changes to the network or printer settings?",
+      "Can you access the printer's web interface or control panel?",
+      "Are there any other printers on the network that are working correctly?"
+    ],
+    "possibilities": []
+  }
+}

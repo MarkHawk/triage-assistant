@@ -1,0 +1,77 @@
+oidc-rp-edge-1  | 2026-10-26T22:12:42.450863516Z 172.30.182.1 - - [26/Oct/2026:22:12:42 +0000] "GET / HTTP/1.1" 200 2548 "-" "curl/8.18.0"
+proxy-1  | 2026-10-26T22:12:42.451580031Z 172.30.182.1 "GET / HTTP/1.1" 200 2548 host=idlab.home:8187 upstream=172.30.182.4:8182 upstream_status=200 request_time=0.001 upstream_time=0.001
+proxy-1  | 2026-10-26T22:12:42.647943777Z 2026/10/26 22:12:42 [notice] 1#1: signal 1 (SIGHUP) received from 28330, reconfiguring
+proxy-1  | 2026-10-26T22:12:42.648539257Z 2026/10/26 22:12:42 [notice] 1#1: reconfiguring
+proxy-1  | 2026-10-26T22:12:42.652205532Z 2026/10/26 22:12:42 [notice] 1#1: using the "epoll" event method
+proxy-1  | 2026-10-26T22:12:42.653108795Z 2026/10/26 22:12:42 [notice] 1#1: start worker processes
+proxy-1  | 2026-10-26T22:12:42.653835700Z 2026/10/26 22:12:42 [notice] 1#1: start worker process 28331
+proxy-1  | 2026-10-26T22:12:42.753563648Z 2026/10/26 22:12:42 [notice] 14821#14821: gracefully shutting down
+proxy-1  | 2026-10-26T22:12:42.755083672Z 2026/10/26 22:12:42 [notice] 14821#14821: exiting
+proxy-1  | 2026-10-26T22:12:42.756823065Z 2026/10/26 22:12:42 [notice] 14821#14821: exit
+proxy-1  | 2026-10-26T22:12:42.771608249Z 2026/10/26 22:12:42 [notice] 1#1: signal 17 (SIGCHLD) received from 14821
+proxy-1  | 2026-10-26T22:12:42.773102258Z 2026/10/26 22:12:42 [notice] 1#1: worker process 14821 exited with code 0
+proxy-1  | 2026-10-26T22:12:42.774593710Z 2026/10/26 22:12:42 [notice] 1#1: signal 29 (SIGIO) received
+oidc-rp-edge-1  | 2026-10-26T22:12:44.141514796Z 2026-10-26 22:12:44,141 INFO oidc-rp event=force_https path=/ scheme=http x_forwarded_proto=-
+oidc-rp-edge-1  | 2026-10-26T22:12:44.141763965Z 172.30.182.10 - - [26/Oct/2026:22:12:44 +0000] "GET / HTTP/1.1" 302 235 "-" "curl/8.18.0"
+proxy-1  | 2026-10-26T22:12:44.142521678Z 172.30.182.1 "GET / HTTP/1.1" 302 235 host=idlab.home:8187 upstream=172.30.182.4:8182 upstream_status=302 request_time=0.001 upstream_time=0.001
+oidc-rp-edge-1  | 2026-10-26T22:12:44.552678485Z 127.0.0.1 - - [26/Oct/2026:22:12:44 +0000] "GET /healthz HTTP/1.1" 200 16 "-" "Python-urllib/3.13"
+oidc-rp-edge-1  | 2026-10-26T22:12:45.616568633Z 2026-10-26 22:12:45,616 INFO oidc-rp event=force_https path=/ scheme=http x_forwarded_proto=-
+oidc-rp-edge-1  | 2026-10-26T22:12:45.616852059Z 172.30.182.10 - - [26/Oct/2026:22:12:45 +0000] "GET / HTTP/1.1" 302 235 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36"
+proxy-1  | 2026-10-26T22:12:45.617795371Z 172.30.182.1 "GET / HTTP/1.1" 302 235 host=idlab.home:8187 upstream=172.30.182.4:8182 upstream_status=302 request_time=0.001 upstream_time=0.001
+oidc-rp-edge-1  | 2026-10-26T22:12:45.619860638Z 172.30.182.10 - - [26/Oct/2026:22:12:45 +0000] "GET / HTTP/1.1" 302 235 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36"
+oidc-rp-edge-1  | 2026-10-26T22:12:45.619914438Z 2026-10-26 22:12:45,619 INFO oidc-rp event=force_https path=/ scheme=http x_forwarded_proto=-
+proxy-1  | 2026-10-26T22:12:45.620714103Z 172.30.182.1 "GET / HTTP/1.1" 302 235 host=idlab.home:8187 upstream=172.30.182.4:8182 upstream_status=302 request_time=0.001 upstream_time=0.001
+oidc-rp-edge-1  | 2026-10-26T22:12:45.621842117Z 2026-10-26 22:12:45,621 INFO oidc-rp event=force_https path=/ scheme=http x_forwarded_proto=-
+oidc-rp-edge-1  | 2026-10-26T22:12:45.622200967Z 172.30.182.10 - - [26/Oct/2026:22:12:45 +0000] "GET / HTTP/1.1" 302 235 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36"
+proxy-1  | 2026-10-26T22:12:45.622932768Z 172.30.182.1 "GET / HTTP/1.1" 302 235 host=idlab.home:8187 upstream=172.30.182.4:8182 upstream_status=302 request_time=0.000 upstream_time=0.001
+oidc-rp-edge-1  | 2026-10-26T22:12:45.623981535Z 2026-10-26 22:12:45,623 INFO oidc-rp event=force_https path=/ scheme=http x_forwarded_proto=-
+oidc-rp-edge-1  | 2026-10-26T22:12:45.624384550Z 172.30.182.10 - - [26/Oct/2026:22:12:45 +0000] "GET / HTTP/1.1" 302 235 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36"
+proxy-1  | 2026-10-26T22:12:45.625074543Z 172.30.182.1 "GET / HTTP/1.1" 302 235 host=idlab.home:8187 upstream=172.30.182.4:8182 upstream_status=302 request_time=0.001 upstream_time=0.001
+oidc-rp-edge-1  | 2026-10-26T22:12:45.626241529Z 2026-10-26 22:12:45,626 INFO oidc-rp event=force_https path=/ scheme=http x_forwarded_proto=-
+oidc-rp-edge-1  | 2026-10-26T22:12:45.626886022Z 172.30.182.10 - - [26/Oct/2026:22:12:45 +0000] "GET / HTTP/1.1" 302 235 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36"
+proxy-1  | 2026-10-26T22:12:45.627320926Z 172.30.182.1 "GET / HTTP/1.1" 302 235 host=idlab.home:8187 upstream=172.30.182.4:8182 upstream_status=302 request_time=0.001 upstream_time=0.001
+oidc-rp-edge-1  | 2026-10-26T22:12:45.628488473Z 2026-10-26 22:12:45,628 INFO oidc-rp event=force_https path=/ scheme=http x_forwarded_proto=-
+oidc-rp-edge-1  | 2026-10-26T22:12:45.628907764Z 172.30.182.10 - - [26/Oct/2026:22:12:45 +0000] "GET / HTTP/1.1" 302 235 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36"
+proxy-1  | 2026-10-26T22:12:45.629575451Z 172.30.182.1 "GET / HTTP/1.1" 302 235 host=idlab.home:8187 upstream=172.30.182.4:8182 upstream_status=302 request_time=0.001 upstream_time=0.001
+oidc-rp-edge-1  | 2026-10-26T22:12:45.630769935Z 2026-10-26 22:12:45,630 INFO oidc-rp event=force_https path=/ scheme=http x_forwarded_proto=-
+oidc-rp-edge-1  | 2026-10-26T22:12:45.631109998Z 172.30.182.10 - - [26/Oct/2026:22:12:45 +0000] "GET / HTTP/1.1" 302 235 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36"
+proxy-1  | 2026-10-26T22:12:45.631866698Z 172.30.182.1 "GET / HTTP/1.1" 302 235 host=idlab.home:8187 upstream=172.30.182.4:8182 upstream_status=302 request_time=0.001 upstream_time=0.001
+oidc-rp-edge-1  | 2026-10-26T22:12:45.635208820Z 2026-10-26 22:12:45,632 INFO oidc-rp event=force_https path=/ scheme=http x_forwarded_proto=-
+oidc-rp-edge-1  | 2026-10-26T22:12:45.635261482Z 172.30.182.10 - - [26/Oct/2026:22:12:45 +0000] "GET / HTTP/1.1" 302 235 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36"
+oidc-rp-edge-1  | 2026-10-26T22:12:45.636035489Z 2026-10-26 22:12:45,635 INFO oidc-rp event=force_https path=/ scheme=http x_forwarded_proto=-
+proxy-1  | 2026-10-26T22:12:45.636094033Z 172.30.182.1 "GET / HTTP/1.1" 302 235 host=idlab.home:8187 upstream=172.30.182.4:8182 upstream_status=302 request_time=0.001 upstream_time=0.001
+oidc-rp-edge-1  | 2026-10-26T22:12:45.636434201Z 172.30.182.10 - - [26/Oct/2026:22:12:45 +0000] "GET / HTTP/1.1" 302 235 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36"
+proxy-1  | 2026-10-26T22:12:45.637960878Z 172.30.182.1 "GET / HTTP/1.1" 302 235 host=idlab.home:8187 upstream=172.30.182.4:8182 upstream_status=302 request_time=0.002 upstream_time=0.002
+oidc-rp-edge-1  | 2026-10-26T22:12:45.639957535Z 2026-10-26 22:12:45,639 INFO oidc-rp event=force_https path=/ scheme=http x_forwarded_proto=-
+oidc-rp-edge-1  | 2026-10-26T22:12:45.640072724Z 172.30.182.10 - - [26/Oct/2026:22:12:45 +0000] "GET / HTTP/1.1" 302 235 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36"
+proxy-1  | 2026-10-26T22:12:45.641877769Z 172.30.182.1 "GET / HTTP/1.1" 302 235 host=idlab.home:8187 upstream=172.30.182.4:8182 upstream_status=302 request_time=0.001 upstream_time=0.001
+oidc-rp-edge-1  | 2026-10-26T22:12:45.644698591Z 2026-10-26 22:12:45,644 INFO oidc-rp event=force_https path=/ scheme=http x_forwarded_proto=-
+oidc-rp-edge-1  | 2026-10-26T22:12:45.645119903Z 172.30.182.10 - - [26/Oct/2026:22:12:45 +0000] "GET / HTTP/1.1" 302 235 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36"
+proxy-1  | 2026-10-26T22:12:45.646189124Z 172.30.182.1 "GET / HTTP/1.1" 302 235 host=idlab.home:8187 upstream=172.30.182.4:8182 upstream_status=302 request_time=0.001 upstream_time=0.001
+proxy-1  | 2026-10-26T22:12:45.651424589Z 172.30.182.1 "GET / HTTP/1.1" 302 235 host=idlab.home:8187 upstream=172.30.182.4:8182 upstream_status=302 request_time=0.003 upstream_time=0.003
+oidc-rp-edge-1  | 2026-10-26T22:12:45.651456380Z 2026-10-26 22:12:45,649 INFO oidc-rp event=force_https path=/ scheme=http x_forwarded_proto=-
+oidc-rp-edge-1  | 2026-10-26T22:12:45.651822628Z 172.30.182.10 - - [26/Oct/2026:22:12:45 +0000] "GET / HTTP/1.1" 302 235 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36"
+oidc-rp-edge-1  | 2026-10-26T22:12:45.654311110Z 2026-10-26 22:12:45,654 INFO oidc-rp event=force_https path=/ scheme=http x_forwarded_proto=-
+oidc-rp-edge-1  | 2026-10-26T22:12:45.655555823Z 172.30.182.10 - - [26/Oct/2026:22:12:45 +0000] "GET / HTTP/1.1" 302 235 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36"
+proxy-1  | 2026-10-26T22:12:45.656606083Z 172.30.182.1 "GET / HTTP/1.1" 302 235 host=idlab.home:8187 upstream=172.30.182.4:8182 upstream_status=302 request_time=0.001 upstream_time=0.001
+oidc-rp-edge-1  | 2026-10-26T22:12:45.660231729Z 2026-10-26 22:12:45,660 INFO oidc-rp event=force_https path=/ scheme=http x_forwarded_proto=-
+oidc-rp-edge-1  | 2026-10-26T22:12:45.662110643Z 172.30.182.10 - - [26/Oct/2026:22:12:45 +0000] "GET / HTTP/1.1" 302 235 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36"
+proxy-1  | 2026-10-26T22:12:45.662158981Z 172.30.182.1 "GET / HTTP/1.1" 302 235 host=idlab.home:8187 upstream=172.30.182.4:8182 upstream_status=302 request_time=0.002 upstream_time=0.002
+oidc-rp-edge-1  | 2026-10-26T22:12:45.667210049Z 2026-10-26 22:12:45,667 INFO oidc-rp event=force_https path=/ scheme=http x_forwarded_proto=-
+oidc-rp-edge-1  | 2026-10-26T22:12:45.667962241Z 172.30.182.10 - - [26/Oct/2026:22:12:45 +0000] "GET / HTTP/1.1" 302 235 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36"
+proxy-1  | 2026-10-26T22:12:45.668547978Z 172.30.182.1 "GET / HTTP/1.1" 302 235 host=idlab.home:8187 upstream=172.30.182.4:8182 upstream_status=302 request_time=0.002 upstream_time=0.002
+oidc-rp-edge-1  | 2026-10-26T22:12:45.671517622Z 2026-10-26 22:12:45,671 INFO oidc-rp event=force_https path=/ scheme=http x_forwarded_proto=-
+oidc-rp-edge-1  | 2026-10-26T22:12:45.671887571Z 172.30.182.10 - - [26/Oct/2026:22:12:45 +0000] "GET / HTTP/1.1" 302 235 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36"
+proxy-1  | 2026-10-26T22:12:45.672444783Z 172.30.182.1 "GET / HTTP/1.1" 302 235 host=idlab.home:8187 upstream=172.30.182.4:8182 upstream_status=302 request_time=0.001 upstream_time=0.001
+oidc-rp-edge-1  | 2026-10-26T22:12:45.675099894Z 2026-10-26 22:12:45,674 INFO oidc-rp event=force_https path=/ scheme=http x_forwarded_proto=-
+oidc-rp-edge-1  | 2026-10-26T22:12:45.675124996Z 172.30.182.10 - - [26/Oct/2026:22:12:45 +0000] "GET / HTTP/1.1" 302 235 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36"
+proxy-1  | 2026-10-26T22:12:45.676100013Z 172.30.182.1 "GET / HTTP/1.1" 302 235 host=idlab.home:8187 upstream=172.30.182.4:8182 upstream_status=302 request_time=0.001 upstream_time=0.001
+oidc-rp-edge-1  | 2026-10-26T22:12:45.679110188Z 2026-10-26 22:12:45,677 INFO oidc-rp event=force_https path=/ scheme=http x_forwarded_proto=-
+oidc-rp-edge-1  | 2026-10-26T22:12:45.679118995Z 172.30.182.10 - - [26/Oct/2026:22:12:45 +0000] "GET / HTTP/1.1" 302 235 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36"
+proxy-1  | 2026-10-26T22:12:45.680795349Z 172.30.182.1 "GET / HTTP/1.1" 302 235 host=idlab.home:8187 upstream=172.30.182.4:8182 upstream_status=302 request_time=0.002 upstream_time=0.002
+oidc-rp-edge-1  | 2026-10-26T22:12:45.682844710Z 2026-10-26 22:12:45,681 INFO oidc-rp event=force_https path=/ scheme=http x_forwarded_proto=-
+oidc-rp-edge-1  | 2026-10-26T22:12:45.682869582Z 172.30.182.10 - - [26/Oct/2026:22:12:45 +0000] "GET / HTTP/1.1" 302 235 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36"
+proxy-1  | 2026-10-26T22:12:45.683613050Z 172.30.182.1 "GET / HTTP/1.1" 302 235 host=idlab.home:8187 upstream=172.30.182.4:8182 upstream_status=302 request_time=0.002 upstream_time=0.002
+oidc-rp-edge-1  | 2026-10-26T22:12:45.685443811Z 2026-10-26 22:12:45,684 INFO oidc-rp event=force_https path=/ scheme=http x_forwarded_proto=-
+oidc-rp-edge-1  | 2026-10-26T22:12:45.685450200Z 172.30.182.10 - - [26/Oct/2026:22:12:45 +0000] "GET / HTTP/1.1" 302 235 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36"
+proxy-1  | 2026-10-26T22:12:45.686560419Z 172.30.182.1 "GET / HTTP/1.1" 302 235 host=idlab.home:8187 upstream=172.30.182.4:8182 upstream_status=302 request_time=0.001 upstream_time=0.001
