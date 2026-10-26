@@ -53,6 +53,7 @@ class Config:
     backend: str
     claude_api_key: str
     claude_model: str
+    claude_refusal_fallback: bool
     ollama_host: str
     ollama_model: str
     ollama_num_ctx: int
@@ -96,6 +97,7 @@ def load_config(env_file: Path | None = None, environ: dict[str, str] | None = N
         backend=backend,
         claude_api_key=env.get("CLAUDE_API_KEY", "").strip(),
         claude_model=env.get("CLAUDE_MODEL", "").strip() or "claude-sonnet-5-5",
+        claude_refusal_fallback=env.get("CLAUDE_REFUSAL_FALLBACK", "1").strip().lower() not in ("0", "no", "false", "off"),
         ollama_host=env.get("OLLAMA_HOST", "").strip().rstrip("/"),
         ollama_model=env.get("OLLAMA_MODEL", "").strip(),
         ollama_num_ctx=num_ctx,
