@@ -1,0 +1,10 @@
+saml-sp-1  | 2026-10-26T22:52:34.012674445Z 127.0.0.1 - - [26/Oct/2026:22:52:34 +0000] "GET /healthz HTTP/1.1" 200 16 "-" "Python-urllib/3.13"
+saml-sp-1  | 2026-10-26T22:52:39.361193542Z 127.0.0.1 - - [26/Oct/2026:22:52:39 +0000] "GET /healthz HTTP/1.1" 200 16 "-" "Python-urllib/3.13"
+saml-sp-1  | 2026-10-26T22:52:44.710235708Z 127.0.0.1 - - [26/Oct/2026:22:52:44 +0000] "GET /healthz HTTP/1.1" 200 16 "-" "Python-urllib/3.13"
+saml-sp-1  | 2026-10-26T22:52:50.055154197Z 127.0.0.1 - - [26/Oct/2026:22:52:50 +0000] "GET /healthz HTTP/1.1" 200 16 "-" "Python-urllib/3.13"
+saml-sp-1  | 2026-10-26T22:52:53.920242486Z 172.18.0.1 - - [26/Oct/2026:22:52:53 +0000] "GET / HTTP/1.1" 200 2636 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36"
+saml-sp-1  | 2026-10-26T22:52:54.030385981Z 2026-10-26 22:52:54,030 INFO saml-sp event=saml_authn_request request_id=ONELOGIN_26565220f7a1d9fcac8331d178399e290ca838c5
+saml-sp-1  | 2026-10-26T22:52:54.032525627Z 172.18.0.1 - - [26/Oct/2026:22:52:54 +0000] "GET /login HTTP/1.1" 302 2509 "https://idlab.home:8181/" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36"
+saml-sp-1  | 2026-10-26T22:52:55.549599548Z 127.0.0.1 - - [26/Oct/2026:22:52:55 +0000] "GET /healthz HTTP/1.1" 200 16 "-" "Python-urllib/3.13"
+saml-sp-1  | 2026-10-26T22:52:55.627256862Z 2026-10-26 22:52:55,627 WARNING saml-sp event=saml_login_failed reason=idp_cert_expired error='IdP signing certificate expired on 2026-10-26 22:52:49 UTC; the SP has no valid IdP certificate pinned' detail='subject=CN=idlab serial=4647d8cc125649d5a59f0eee6877f3c0 notAfter=2026-10-26 22:52:49 UTC sp_clock=2026-10-26 22:52:55 UTC' sp_clock_minus_issue_instant='+0 s'
+saml-sp-1  | 2026-10-26T22:52:55.634410666Z 172.18.0.1 - - [26/Oct/2026:22:52:55 +0000] "POST /saml/acs HTTP/1.1" 401 3699 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36"

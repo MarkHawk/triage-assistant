@@ -7,25 +7,30 @@
   "answer": {
     "outcome": "redirect-loop",
     "confidence": "high",
-    "likely_cause": "The Northgate Expenses app is experiencing a redirect loop due to missing or incorrect `X-Forwarded-Proto` headers.",
+    "likely_cause": "A header line added to the proxy's configuration for this app made the proxy stop telling the app that browsers connect over HTTPS.",
     "evidence": [
       {
         "line": "2026-10-26 22:12:44,141 INFO oidc-rp event=force_https path=/ scheme=http x_forwarded_proto=-",
-        "why": "The app is forcing HTTPS but is receiving an HTTP request, indicated by `scheme=http` and `x_forwarded_proto=-`."
+        "why": "The app thinks the request was plain HTTP."
       },
       {
         "line": "172.30.182.10 - - [26/Oct/2026:22:12:45 +0000] \"GET / HTTP/1.1\" 302 235 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36\"",
-        "why": "The app is responding with a 302 redirect, indicating a loop."
+        "why": "The app is sending a 302 redirect."
       }
     ],
     "fix_steps": [
-      "Check the nginx configuration for the location block serving the Northgate Expenses app.",
-      "Ensure that the `proxy_set_header X-Forwarded-Proto $scheme` directive is present and correctly configured.",
-      "If necessary, add the missing `proxy_set_header` directives to the location block.",
-      "Run `nginx -t` to test the configuration and `nginx -s reload` to apply the changes."
+      "Check the proxy configuration for the Northgate Expenses app and ensure that the `proxy_set_header` directive includes `X-Forwarded-Proto $scheme`.",
+      "If the `proxy_set_header` directive is present, ensure that it repeats all necessary headers.",
+      "Reload the nginx configuration with `nginx -t` and `nginx -s reload`.",
+      "Verify the fix by using `curl -sS -I https://LAB_HOST:8187/` and checking for a 200 response."
     ],
-    "customer_reply": "We have identified that the Northgate Expenses app is experiencing a redirect loop due to missing or incorrect headers. We are working to correct the configuration and will update you shortly.",
-    "questions_for_customer": [],
+    "customer_reply": "We believe the issue is due to a misconfiguration in the proxy settings for the Northgate Expenses app. Our team is working to correct this by ensuring the proxy sends the correct headers to the app. Once the fix is applied, we will verify it and let you know when it's resolved.",
+    "questions_for_customer": [
+      "Does the issue occur for every user and on every page before any login?",
+      "What does `curl -sS -I` on the failing URL return?",
+      "Where does TLS end: at the app, at a proxy, or at a load balancer?",
+      "How many proxies are in front of the app, and what changes have been made to them recently?"
+    ],
     "possibilities": []
   }
 }

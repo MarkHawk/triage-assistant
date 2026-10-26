@@ -1,0 +1,36 @@
+{
+  "meta": {
+    "recorded": "2026-10-26",
+    "backend": "ollama",
+    "model": "qwen2.5:14b"
+  },
+  "answer": {
+    "outcome": "cors-blocked",
+    "confidence": "high",
+    "likely_cause": "The 'Access-Control-Allow-Origin' header has a value 'https://idlab.home:8182/' that is not equal to the supplied origin.",
+    "evidence": [
+      {
+        "line": "2026-10-26 22:53:45,648 INFO api event=api_cors_preflight origin=https://idlab.home:8182 method=GET headers=authorization",
+        "why": "The preflight request was successful."
+      },
+      {
+        "line": "2026-10-26 22:53:45,680 INFO api event=api_request_ok sub=1e7d717f-82d0-49ab-bb06-c34330a53287 azp=oidc-rp iat=2026-10-26T22:53:45Z exp=2026-10-26T22:58:45Z origin=https://idlab.home:8182 cors_allow_origin=https://idlab.home:8182/",
+        "why": "The API responded successfully to the GET request."
+      }
+    ],
+    "fix_steps": [
+      "Make the API's Access-Control-Allow-Origin match the page's origin exactly.",
+      "Run the fix script: scripts/fix.sh cors-blocked",
+      "Verify the fix by checking the browser console and network tab."
+    ],
+    "customer_reply": "We believe the issue is related to Cross-Origin Resource Sharing (CORS) settings. The browser is blocking the API call due to a mismatch in the 'Access-Control-Allow-Origin' header. We will adjust the CORS settings to match the page's origin exactly. Please check the browser's developer console (F12) for any further errors and let us know if the issue persists.",
+    "questions_for_customer": [
+      "What does the browser's developer console say, word for word?",
+      "What is the exact origin of the page making the call?",
+      "Does the same request work from curl or Postman?",
+      "Is there an OPTIONS request before the call in the Network tab?",
+      "What changes have been made recently to the web app's domain or port?"
+    ],
+    "possibilities": []
+  }
+}

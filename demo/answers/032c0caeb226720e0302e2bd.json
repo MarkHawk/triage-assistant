@@ -1,0 +1,25 @@
+{
+  "meta": {
+    "recorded": "2026-10-26",
+    "backend": "ollama",
+    "model": "qwen2.5-coder:14b"
+  },
+  "answer": {
+    "outcome": "expired-signing-cert",
+    "confidence": "high",
+    "likely_cause": "The IdP signing certificate configured in your application expired at 2026-10-26 22:52:49 UTC, and the application correctly rejects assertions it can no longer trust.",
+    "evidence": [
+      {
+        "line": "2026-10-26 22:52:55,627 WARNING saml-sp event=saml_login_failed reason=idp_cert_expired error='IdP signing certificate expired on 2026-10-26 22:52:49 UTC; the SP has no valid IdP certificate pinned' detail='subject=CN=idlab serial=4647d8cc125649d5a59f0eee6877f3c0 notAfter=2026-10-26 22:52:49 UTC sp_clock=2026-10-26 22:52:55 UTC' sp_clock_minus_issue_instant='+0 s'",
+        "why": "This log line confirms that the IdP signing certificate expired at the exact time the issue started."
+      }
+    ],
+    "fix_steps": [
+      "Rotate the certificate on the IdP.",
+      "Re-exchange the new certificate with every SP that pinned it."
+    ],
+    "customer_reply": "We think the issue is due to an expired signing certificate on the IdP. We are working on rotating the certificate and re-exchanging it with the Staff Portal. We will keep you updated on the progress.",
+    "questions_for_customer": [],
+    "possibilities": []
+  }
+}

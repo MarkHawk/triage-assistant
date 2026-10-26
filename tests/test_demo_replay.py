@@ -34,11 +34,14 @@ def replay(world, ticket_file, logs_file=None):
                       scenarios=world["scenarios"], guard=world["guard"], system_text=world["system_text"])
 
 
-def test_redirect_loop_diagnosis_replays_from_the_recording(world):
-    result = replay(world, "redirect-loop/ticket.md", "redirect-loop/logs.txt")
+@pytest.mark.parametrize("scenario,runbook", [("redirect-loop", "15-redirect-loop.md"), ("expired-signing-cert", "01-expired-signing-cert.md"),
+                                               ("cors-blocked", "19-cors-blocked.md")])
+def test_each_recorded_diagnosis_replays_with_verified_evidence(world, scenario, runbook):
+    result = replay(world, f"{scenario}/ticket.md", f"{scenario}/logs.txt")
     assert result.mode == "diagnose" and result.answer.source == "model" and result.attempts == 1
-    assert result.answer.outcome == "redirect-loop" and result.answer.runbook.endswith("15-redirect-loop.md")
+    assert result.answer.outcome == scenario and result.answer.runbook.endswith(runbook)
     assert result.answer.evidence and all(e.source == "log" for e in result.answer.evidence), result.answer.warnings
+    assert result.answer.warnings == []  # nothing had to be corrected: it is the best run
 
 
 def test_printer_clarify_answer_replays_and_asserts_nothing(world):
