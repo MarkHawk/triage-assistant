@@ -62,8 +62,10 @@ class Finding:
 
 @dataclass(frozen=True)
 class MaskedTicket:
+    """Text with secrets masked, and what was found. Used for tickets and, if allowed, for log lines."""
     text: str
     findings: tuple[Finding, ...]
+    what: str = "ticket"
 
     @property
     def flagged(self) -> bool:
@@ -74,15 +76,18 @@ class MaskedTicket:
         """Shown to the engineer in the output."""
         if not self.findings:
             return ""
-        what = ", ".join(f"{f.count} x {f.kind}" for f in self.findings)
-        return (f"WARNING: the ticket contained secret values ({what}). They were masked before "
+        found = ", ".join(f"{f.count} x {f.kind}" for f in self.findings)
+        if self.what == "log lines":
+            return (f"WARNING: the log lines contained secret values ({found}). They were masked before "
+                    "anything was sent to a model. The lab masks its logs, so find out where these came from.")
+        return (f"WARNING: the ticket contained secret values ({found}). They were masked before "
                 "anything was sent to a model. Consider asking the customer to reset anything that "
                 "was exposed.")
 
     @property
     def model_note(self) -> str:
         """Added to the model's input so the customer reply carries the advice."""
-        if not self.findings:
+        if not self.findings or self.what != "ticket":
             return ""
         return ("Note from the system: the customer pasted secret values (shown as [MASKED:...]). "
                 "Do not try to read them. In the customer reply, politely advise them not to send "
@@ -146,8 +151,15 @@ class Guard:
 
     def mask_ticket(self, text: str) -> MaskedTicket:
         """Mask pasted secrets in a ticket. A lab .env value is still a hard refusal."""
+        return self._mask(text, "ticket")
+
+    def mask_logs(self, text: str) -> MaskedTicket:
+        """Mask secrets in log lines. A lab .env value is still a hard refusal."""
+        return self._mask(text, "log lines")
+
+    def _mask(self, text: str, what: str) -> MaskedTicket:
         if self._lab_hits(text):
-            raise SecretFound("refused: the ticket contains a value from the lab's .env; nothing was sent")
+            raise SecretFound(f"refused: the {what} contain{'s' if what == 'ticket' else ''} a value from the lab's .env; nothing was sent")
         counts: Counter[str] = Counter()
 
         def mask_with(kind: str):
@@ -161,4 +173,4 @@ class Guard:
 
         for kind, pattern in _PATTERNS:
             text = pattern.sub(mask_with(kind), text)
-        return MaskedTicket(text=text, findings=tuple(Finding(k, n) for k, n in counts.items()))
+        return MaskedTicket(text=text, findings=tuple(Finding(k, n) for k, n in counts.items()), what=what)

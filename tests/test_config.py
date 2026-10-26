@@ -53,3 +53,10 @@ def test_backend_needs_its_settings(tmp_path):
 
 def test_ollama_host_trailing_slash_removed(tmp_path):
     assert cfg(tmp_path, "OLLAMA_HOST=http://box.lan:11434/\n").ollama_host == "http://box.lan:11434"
+
+
+def test_log_secrets_defaults_to_mask_and_can_be_refuse(tmp_path):
+    assert cfg(tmp_path).log_secrets == "mask"
+    assert cfg(tmp_path, "LOG_SECRETS=refuse\n").log_secrets == "refuse"
+    with pytest.raises(ConfigError):
+        cfg(tmp_path, "LOG_SECRETS=ignore\n")

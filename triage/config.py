@@ -61,6 +61,7 @@ class Config:
     ollama_first_timeout_s: int
     ollama_timeout_s: int
     ollama_keep_alive: str
+    log_secrets: str  # "mask" (default) or "refuse"
 
     @property
     def ollama_prompt_budget_tokens(self) -> int:
@@ -92,6 +93,10 @@ def load_config(env_file: Path | None = None, environ: dict[str, str] | None = N
     if reserve >= num_ctx:
         raise ConfigError("OLLAMA_RESERVE_OUTPUT_TOKENS must be smaller than OLLAMA_NUM_CTX")
 
+    log_secrets = env.get("LOG_SECRETS", "").strip().lower() or "mask"
+    if log_secrets not in ("mask", "refuse"):
+        raise ConfigError(f"LOG_SECRETS must be mask or refuse, got {log_secrets!r}")
+
     return Config(
         lab_dir=lab.resolve(),
         backend=backend,
@@ -105,4 +110,5 @@ def load_config(env_file: Path | None = None, environ: dict[str, str] | None = N
         ollama_first_timeout_s=_int(env, "OLLAMA_FIRST_TIMEOUT_S", 600),
         ollama_timeout_s=_int(env, "OLLAMA_TIMEOUT_S", 300),
         ollama_keep_alive=env.get("OLLAMA_KEEP_ALIVE", "").strip() or "30m",
+        log_secrets=log_secrets,
     )

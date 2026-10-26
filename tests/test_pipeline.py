@@ -193,11 +193,53 @@ def test_offline_answer_to_a_ticket_with_a_secret_also_advises(world):
     assert any("WARNING" in f for f in result.flags) and "do not send passwords" in result.answer.customer_reply.lower()
 
 
-def test_secret_in_logs_is_a_hard_refusal_and_nothing_is_sent(world):
+def test_secret_in_logs_is_masked_flagged_and_triage_continues_by_default(world):
+    backend = Scripted(world["guard"], [CLARIFY_GOOD])
+    logs = f"{LOOP_LOG}\n2026-10-22 08:44:58,000 INFO app token={JWT}"
+    result = triage(world, QUERY_15, logs=logs, backend=backend)
+    assert any("log lines contained secret values" in f for f in result.flags)
+    sent = backend.prompts[0].user
+    assert JWT not in sent and "[MASKED:" in sent and LOOP_LOG in sent
+    assert "advise them" not in sent  # the customer-reply advice is only for secrets in the ticket
+    assert "do not send passwords" not in result.answer.customer_reply.lower()
+
+
+def test_evidence_is_checked_against_the_masked_logs_the_model_saw(world):
+    # token=<jwt> is masked as a jwt first; either way the model only ever saw a masked line
+    logs = f"{LOOP_LOG}\n2026-10-22 08:44:58,000 INFO app token={JWT}"
+    quoted = {**DIAGNOSIS, "evidence": [{"line": LOOP_LOG, "why": "x"}]}
+    result = triage(world, "The portal goes round in circles", logs, Scripted(world["guard"], [quoted]))
+    assert result.answer.evidence and JWT not in result.answer.evidence[0].line
+    leaked = {**DIAGNOSIS, "evidence": [{"line": f"2026-10-22 08:44:58,000 INFO app token={JWT}", "why": "x"}]}
+    result = triage(world, "The portal goes round in circles", logs, Scripted(world["guard"], [leaked]))
+    assert result.answer.evidence == []  # the unmasked line is not in what the model was given, so it is dropped
+
+
+def test_secret_in_logs_can_still_be_a_hard_refusal(world):
     backend = Scripted(world["guard"], [CLARIFY_GOOD])
     with pytest.raises(SecretFound):
-        triage(world, QUERY_15, logs=f"INFO something token={JWT}", backend=backend)
+        run_triage(QUERY_15, f"INFO something token={JWT}", backend=backend, retriever=world["retriever"],
+                   scenarios=world["scenarios"], guard=world["guard"], system_text=world["system_text"], log_secrets="refuse")
     assert backend.prompts == []
+
+
+@pytest.mark.parametrize("mode", ["mask", "refuse"])
+def test_lab_env_value_in_logs_is_a_hard_refusal_in_both_modes(world, mode):
+    guard = Guard({"lab-secret-value-12345"})
+    backend = Scripted(guard, [CLARIFY_GOOD])
+    with pytest.raises(SecretFound):
+        run_triage(QUERY_15, "INFO leaked lab-secret-value-12345", backend=backend, retriever=world["retriever"],
+                   scenarios=world["scenarios"], guard=guard, system_text=world["system_text"], log_secrets=mode)
+    assert backend.prompts == []
+
+
+def test_attempts_and_fallback_are_reported(world):
+    first = triage(world, QUERY_15, backend=Scripted(world["guard"], [CLARIFY_GOOD]))
+    assert first.attempts == 1 and not first.code_fallback
+    retried = triage(world, QUERY_15, backend=Scripted(world["guard"], [CLARIFY_BAD, CLARIFY_GOOD]))
+    assert retried.attempts == 2 and not retried.code_fallback
+    fell = triage(world, QUERY_15, backend=Scripted(world["guard"], [CLARIFY_BAD, CLARIFY_BAD]))
+    assert fell.attempts == 2 and fell.code_fallback
 
 
 def test_lab_env_value_in_a_ticket_is_a_hard_refusal(world):

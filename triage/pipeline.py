@@ -31,7 +31,9 @@ class Triage:
     flags: list[str]  # shown to the engineer above the answer
     prompt: Prompt | None = None
     raw: dict | None = None  # what the model returned, for --record
-    notes: list[str] = field(default_factory=list)
+    attempts: int = 0  # requests made to the backend; 2 means the first answer was sent back
+    code_fallback: bool = False  # the model kept breaking the clarify rules and code built the answer
+    stats: dict = field(default_factory=dict)  # what the backend reported about its last request
 
 
 def decide_mode(result: Result) -> str:
@@ -39,12 +41,19 @@ def decide_mode(result: Result) -> str:
 
 
 def run_triage(ticket_text: str, logs_text: str, *, backend: Backend, retriever: Retriever,
-               scenarios: dict[str, Scenario], guard: Guard, system_text: str) -> Triage:
-    """Raises SecretFound if the logs hold a secret or the ticket holds a lab .env value,
-    and BackendError if the model could not be used."""
+               scenarios: dict[str, Scenario], guard: Guard, system_text: str, log_secrets: str = "mask") -> Triage:
+    """Secrets in the ticket, and by default in the logs, are masked and flagged. With log_secrets="refuse" a secret
+    in the logs raises SecretFound. A lab .env value anywhere raises SecretFound. BackendError if the model
+    could not be used."""
     masked = guard.mask_ticket(ticket_text)
-    guard.check_log(logs_text, source="the log lines")
     flags = [masked.engineer_flag] if masked.flagged else []
+    if log_secrets == "refuse":
+        guard.check_log(logs_text, source="the log lines")
+    else:
+        masked_logs = guard.mask_logs(logs_text)
+        logs_text = masked_logs.text
+        if masked_logs.flagged:
+            flags.append(masked_logs.engineer_flag)
 
     result = retriever.search(masked.text, logs_text)
     mode = decide_mode(result)
@@ -67,19 +76,20 @@ def run_triage(ticket_text: str, logs_text: str, *, backend: Backend, retriever:
     for attempt in range(MAX_ATTEMPTS):
         asked = prompt if not feedback else _with_feedback(prompt, feedback)
         raw = backend.complete(asked, schema)
+        attempts = attempt + 1
         try:
             answer, violations = ans.check(raw, ctx)
         except ans.AnswerError as exc:
             violations, answer = [f"the reply was unusable: {exc}"], None
         if not violations:
-            return Triage(answer, mode, result, flags, prompt, raw)
+            return Triage(answer, mode, result, flags, prompt, raw, attempts, False, dict(backend.last_stats))
         feedback = "Your previous reply broke these rules, so it was discarded: " + "; ".join(violations) + ". Reply again."
     if mode == "clarify":  # the model keeps asserting; code builds a safe answer instead
         fallback = build_clarify_answer(list(result.matches), result.hints)
         ans.add_secrets_advice(fallback, masked.flagged)
         fallback.warnings.insert(0, "The model's answer broke the clarify rules twice, so this one was built by code: "
                                     + "; ".join(violations))
-        return Triage(fallback, mode, result, flags, prompt, None)
+        return Triage(fallback, mode, result, flags, prompt, None, attempts, True, dict(backend.last_stats))
     raise BackendError("The model's answer could not be used: " + "; ".join(violations))
 
 

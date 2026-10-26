@@ -110,3 +110,16 @@ def test_lab_secrets_come_from_secret_looking_keys_only(tmp_path):
 
 def test_no_lab_env_means_no_lab_secrets(tmp_path):
     assert load_lab_secrets(tmp_path) == frozenset()
+
+
+def test_log_masking_flags_the_logs_not_the_ticket_and_adds_no_reply_advice(guard):
+    masked = guard.mask_logs(f"INFO login token={JWT}")
+    assert masked.flagged and JWT not in masked.text
+    assert "log lines" in masked.engineer_flag and "ticket" not in masked.engineer_flag
+    assert masked.model_note == ""
+
+
+def test_lab_env_value_in_logs_is_refused_when_masking(guard):
+    with pytest.raises(SecretFound) as err:
+        guard.mask_logs(f"INFO x {LAB_SECRET}")
+    assert LAB_SECRET not in str(err.value) and "log lines" in str(err.value)
