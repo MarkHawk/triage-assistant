@@ -48,6 +48,17 @@ A match is **strong** if it has any evidence beyond keywords, and **weak** other
 
 Be careful reading the last column. After the first run I fixed what the failures showed (a keyword floor, a word-coverage check, a better stemmer and a few phrases), so the held-out and fresh sets are no longer independent evidence; the "first run" column is the fair one. The one known miss is an unrelated ticket ("Why is my laptop so slow since the update?") that gets weak keyword matches. It is marked weak, so the model is told they are only possibilities. Your ticket set is the real test; until then, `tests/test_retrieval.py` has floors so retrieval can't quietly get worse.
 
+### Known limitations
+
+- **Vague whole-organisation outages are genuinely ambiguous.** "Everybody got kicked out at about nine this morning and nobody touched anything" fits runbooks 01 (expired signing certificate), 02 (clock skew), 04 (directory bind) and 17 (maintenance left on) equally well, because none of them has an error text to tell them apart. Retrieval gets this wrong in the one cold-set miss: it returns only runbook 08 (rate limit), as a **weak** match, because of words like "every" and "morning". That is why a weak-only result never gets a stated cause: the assistant asks questions instead (see Ticket mode below). The miss is recorded, not fixed.
+- **Unrelated tickets can still get weak matches.** A laptop, printer or finance-group request returns weak keyword matches rather than nothing. They are labelled weak, and the answer then asserts nothing.
+
+### The cold set
+
+`tests/cold_queries.yaml` holds 24 queries written without seeing the retriever, the phrases file or the tuned sets. It was run once with no tuning and scored **23 of 24** (19 fault queries, 18 correct; 5 that should match nothing, all correct as "nothing strong"). It is pinned by hash in `tests/test_cold_set.py`, which also holds a regression floor of 23.
+
+**It stops being independent evidence the moment anything is tuned against it.** If that ever happens, say so here and stop quoting the score as held-out.
+
 ## Safety
 
 - A secret in lab logs, or any value from the lab's own `.env`, is a hard refusal: nothing is sent to a model.
