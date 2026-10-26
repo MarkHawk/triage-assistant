@@ -1,0 +1,49 @@
+# The fictional company the assistant works for, and what its staff call the
+# lab's components. identity-lab does not use these names today, so they live
+# here. If the lab's templates ever carry a "Northgate ..." name, triage/names.py
+# prefers it; nothing depends on that.
+company: Northgate Supplies
+systems:
+  staff-portal:
+    display: Northgate Staff Portal
+    lab_component: saml-sp
+    protocol: SAML 2.0
+    ports: [8181, 8184]
+    staff_say: [staff portal, the portal, intranet, hr portal]
+  expenses:
+    display: Northgate Expenses
+    lab_component: oidc-rp
+    protocol: OpenID Connect
+    ports: [8182, 8185, 8186, 8187]
+    staff_say: [expenses, expenses app, claims]
+  expenses-api:
+    display: Northgate Expenses data service
+    lab_component: api
+    protocol: OAuth 2.0 bearer tokens
+    ports: [8188]
+    staff_say: [the data won't load, receipts won't load, the page loads but the list is empty]
+  staff-sign-in:
+    display: Northgate staff sign-in
+    lab_component: keycloak
+    protocol: SAML 2.0 and OpenID Connect
+    ports: [8180, 8183]
+    staff_say: [sign in, log in, the login page, single sign-on]
+  office-network-login:
+    display: Northgate office network login
+    lab_component: nas
+    protocol: RADIUS
+    staff_say: [office wi-fi, vpn, network password]
+  web-gateway:
+    display: Northgate web gateway
+    lab_component: proxy
+    staff_say: [load balancer, the gateway]
+  outbound-gateway:
+    display: Northgate outbound proxy
+    lab_component: squid
+    staff_say: [the proxy, internet filter]
+  partner-link:
+    display: Northgate partner link
+    lab_component: proxy
+    protocol: mutual TLS
+    ports: [8189]
+    staff_say: [partner connection, supplier feed]
