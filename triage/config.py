@@ -88,7 +88,7 @@ def load_config(env_file: Path | None = None, environ: dict[str, str] | None = N
     if not lab.is_absolute():
         lab = REPO_ROOT / lab
 
-    num_ctx = _int(env, "OLLAMA_NUM_CTX", 8192, minimum=2048)
+    num_ctx = _int(env, "OLLAMA_NUM_CTX", 12288, minimum=2048)
     reserve = _int(env, "OLLAMA_RESERVE_OUTPUT_TOKENS", 1500, minimum=256)
     if reserve >= num_ctx:
         raise ConfigError("OLLAMA_RESERVE_OUTPUT_TOKENS must be smaller than OLLAMA_NUM_CTX")

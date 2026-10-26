@@ -98,13 +98,13 @@ For a model of about 14B parameters on a 16 GB GPU, `OLLAMA_NUM_CTX` is sent wit
 - An answer cut off by the length cap is an error too.
 - The first request has its own, longer timeout (`OLLAMA_FIRST_TIMEOUT_S`) because it may load the model into the GPU.
 
-The worst case is tested: three of the longest runbooks, a 60 KB log snapshot and a very long ticket, at windows of 8192, 12288 and 16384 tokens. It fits, but the window decides how much of each runbook the model sees (the runbooks run up to about 10,000 characters):
+The worst case is tested: three of the longest runbooks, a 60 KB log snapshot and a very long ticket, at windows of 8192, 12288 and 16384 tokens. It fits, but the window decides how much of each runbook the model sees (the runbooks run up to about 10,000 characters). The ceiling for one runbook extract grows with the window; the figures below are the worst case, with 60 KB of logs competing for the space, and a typical ticket sees more:
 
 | `OLLAMA_NUM_CTX` | Each runbook extract, worst case | Prompt estimate |
 |---|---|---|
-| 8192 | about 2,000 characters | about 6,300 tokens |
-| 12288 | about 3,400 characters | about 10,200 tokens |
-| 16384 | about 5,000 to 5,700 characters | about 13,900 tokens |
+| 8192 | about 2,100 to 2,400 characters | about 6,300 tokens |
+| 12288 | about 3,800 to 4,500 characters | about 10,300 tokens |
+| 16384 | about 6,700 to 7,200 characters | about 14,600 tokens |
 
 Whether a given 14B model fits 12288 or 16384 on a 16 GB card depends on its quantisation, so check VRAM before raising it. To run Ollama on a different machine, such as a Windows PC with a GPU, see [docs/ollama-on-another-machine.md](docs/ollama-on-another-machine.md). What a real run measured, including a correction to the token estimate, is in [docs/live-runs-ollama.md](docs/live-runs-ollama.md).
 

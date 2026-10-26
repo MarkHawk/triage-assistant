@@ -13,7 +13,7 @@ def test_defaults_are_safe(tmp_path):
     c = cfg(tmp_path)
     assert c.backend == "demo"
     assert c.claude_model == "claude-sonnet-5-5"
-    assert c.ollama_num_ctx == 8192
+    assert c.ollama_num_ctx == 12288
     assert c.ollama_first_timeout_s > c.ollama_timeout_s
     assert c.lab_dir.is_absolute()
 

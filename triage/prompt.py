@@ -7,6 +7,7 @@ checks what it was told the model actually read, so nothing is cut silently.
 
 from __future__ import annotations
 
+import json
 import math
 import re
 from dataclasses import dataclass, field
@@ -36,9 +37,15 @@ class Budget:
     prompt_tokens: int
     max_ticket_chars: int = 6000
     max_log_chars: int = 12000
-    max_excerpt_chars: int = 6000
     ticket_share: float = 0.20
     log_share: float = 0.30
+    excerpt_share: float = 0.30  # one runbook extract may use up to this share of the window
+
+    @property
+    def max_excerpt_chars(self) -> int:
+        """Ceiling for one runbook extract. It grows with the window, so a bigger window shows more of each
+        runbook (they run up to about 10,000 characters), and never drops below 6000."""
+        return max(6000, int(self.prompt_tokens * self.excerpt_share * RUNBOOK_CHARS_PER_TOKEN))
 
 
 CLAUDE_BUDGET = Budget(prompt_tokens=60000)
@@ -92,12 +99,26 @@ _DIAGNOSE = """Mode: DIAGNOSE. At least one runbook below is a strong match.
 - possibilities must be an empty list: they are only for clarify mode.
 - customer_reply: tell the customer, in plain words, what we think is wrong and what we are doing about it. Ask them to do something only if the runbook needs it."""
 
+CLARIFY_EXAMPLE = {
+    "outcome": "needs_more_info", "confidence": "low", "likely_cause": "", "evidence": [], "fix_steps": [],
+    "customer_reply": ("Thank you for letting us know. To work out what is going wrong we need a little more detail. "
+                       "Could you tell us what you see on the screen when it fails, whether it happens for everyone or only "
+                       "for you, and how long it takes before the error appears? Northgate Supplies IT Support"),
+    "questions_for_customer": ["What exactly do you see when it fails? Please copy any error message.",
+                               "Does it happen for everyone, or only for some people?",
+                               "How long after you press Log in does the error appear?"],
+    "possibilities": [{"runbook_number": 7, "if_this": "the error is a gateway time-out that appears several seconds after the password"}],
+}
+
 _CLARIFY = """Mode: CLARIFY. No runbook below is a strong match, so nothing is established.
 - Do NOT state or imply a cause. likely_cause must be an empty string and fix_steps an empty list.
 - outcome must be "needs_more_info"{hint_clause}. confidence must be "low".
 - questions_for_customer: 3 to 6 questions that would tell the runbooks below apart or rule them out, drawn from their symptoms and "Questions I'd ask the customer".
 - possibilities: only for a runbook that could plausibly apply. Give runbook_number and if_this, a condition the customer's answers would have to confirm, written as a fragment that follows the word "If", for example "the page shows a 401 error". Never write a possibility as a finding ("The issue is ..."). If the ticket does not look like a sign-in, network login or web access problem (a printer, say), return an empty possibilities list and make the first question ask what they are trying to do.
-- customer_reply: thank them, ask the questions in plain words, say nothing about a cause."""
+- customer_reply: thank them, ask the questions in plain words, say nothing about a cause.
+
+An example of a compliant reply, for a different, vague ticket. Follow its shape, not its content:
+{example}"""
 
 
 def build_prompt(system_text: str, mode: str, ticket_text: str, logs_text: str, matches: list[Match],
@@ -105,7 +126,8 @@ def build_prompt(system_text: str, mode: str, ticket_text: str, logs_text: str, 
     """Assemble the request, trimming the ticket, logs and runbook extracts to the budget."""
     shown = list(matches)  # strong first (retrieval order); each is labelled
     hint_clause = ' (or "not_a_lab_fault" only if the hint below clearly applies)' if hints else ""
-    instructions = (_DIAGNOSE if mode == "diagnose" else _CLARIFY.replace("{hint_clause}", hint_clause))
+    instructions = (_DIAGNOSE if mode == "diagnose" else
+                    _CLARIFY.replace("{hint_clause}", hint_clause).replace("{example}", json.dumps(CLARIFY_EXAMPLE, indent=1)))
     scaffold = "\n".join([instructions, "<ticket>", "</ticket>", "<logs>", "</logs>", "<runbooks>", "</runbooks>"])
     fixed = tokens(system_text) + tokens(scaffold) + tokens(ticket_note) + OVERHEAD_TOKENS
     remaining = budget.prompt_tokens - fixed
