@@ -12,7 +12,7 @@ SCENARIO_RUNBOOK="runbooks/14-proxy-bypass.md"
 SCENARIO_APP=oidc-egress
 SCENARIO_UNAFFECTED="oidc alice"
 SCENARIO_EXPECT="Failed to resolve 'keycloak'"
-SCENARIO_LOG='event=oidc_login_failed .*NameResolutionError'
+SCENARIO_LOG='oidc-rp-egress event=oidc_login_failed .*NameResolutionError'
 
 scenario_detect() { :; }
 '''
@@ -26,6 +26,7 @@ def test_parse_sample(tmp_path):
     assert s.runbook_number == 14
     assert s.app == "oidc-egress"
     assert s.expect == "Failed to resolve 'keycloak'"
+    assert s.log_service == "oidc-rp-egress"
     assert s.log_pattern == "event=oidc_login_failed .*NameResolutionError"
     assert s.unaffected == "oidc alice"
 
@@ -45,3 +46,14 @@ def test_every_real_scenario_parses_and_has_a_runbook():
     assert len(scenarios) >= 21
     for s in scenarios.values():
         assert Path(lab, s.runbook).is_file(), s.name
+
+
+def test_every_real_scenario_has_a_service_and_a_pattern_that_compiles():
+    import re
+
+    lab = load_config(environ={}).lab_dir
+    if not (lab / "scenarios").is_dir():
+        pytest.skip("identity-lab not found at LAB_DIR")
+    for s in load_scenarios(lab).values():
+        assert s.log_service and s.log_pattern, s.name
+        re.compile(s.log_pattern)
