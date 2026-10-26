@@ -30,6 +30,7 @@ class Backend:
     def __init__(self, guard: Guard, budget: Budget):
         self.guard = guard
         self.budget = budget
+        self.last_stats: dict = {}  # what the server reported about the last request, for the run footer
 
     def complete(self, prompt: Prompt, schema: dict) -> dict:
         """Check the whole prompt for secrets, then ask the model. Raises SecretFound before sending."""

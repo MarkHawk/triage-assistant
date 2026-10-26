@@ -23,12 +23,32 @@ def test_ticket_file_with_header_and_log_section(tmp_path, capsys):
     assert "runbook 15" in capsys.readouterr().out
 
 
-def test_secret_in_logs_exits_3_and_never_prints_it(tmp_path, capsys):
+def test_secret_in_logs_is_masked_and_flagged_by_default(tmp_path, capsys):
+    logs = tmp_path / "logs.txt"
+    logs.write_text(f"INFO login ok token={JWT}\n")
+    assert main(["ticket", "--text", "The printer on the second floor shows as offline", "--logs", str(logs)]) == 0
+    captured = capsys.readouterr()
+    assert captured.out.startswith("> WARNING: the log lines contained secret values") and JWT not in captured.out + captured.err
+
+
+def test_log_secrets_refuse_option_exits_3_and_never_prints_it(tmp_path, capsys, monkeypatch):
+    monkeypatch.setenv("LOG_SECRETS", "refuse")
     logs = tmp_path / "logs.txt"
     logs.write_text(f"INFO login ok token={JWT}\n")
     assert main(["ticket", "--text", "It loops", "--logs", str(logs)]) == 3
     captured = capsys.readouterr()
     assert "refused" in captured.err and JWT not in captured.out + captured.err and "nothing was sent" in captured.err
+
+
+def test_the_footer_says_how_the_answer_was_made(capsys):
+    assert main(["ticket", "--text", "The printer on the second floor shows as offline"]) == 0
+    err = capsys.readouterr().err
+    assert "demo" in err and "mode clarify" in err and "no model used" in err
+
+
+def test_num_ctx_override_must_leave_room_for_the_answer(capsys):
+    assert main(["ticket", "--backend", "demo", "--num-ctx", "1000", "--text", "x"]) == 2
+    assert "OLLAMA_RESERVE_OUTPUT_TOKENS" in capsys.readouterr().err
 
 
 def test_demo_without_a_recording_exits_4_with_advice(capsys):

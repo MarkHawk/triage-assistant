@@ -83,8 +83,10 @@ Whatever a model returns is checked before you see it: quoted evidence that is n
 
 ## Safety
 
-- A secret in lab logs, or any value from the lab's own `.env`, is a hard refusal: nothing is sent to a model.
+- A value from the lab's own `.env` is a hard refusal anywhere: nothing is sent to a model.
 - Tokens, cookies and SAML responses pasted into a **ticket** are masked, flagged to the engineer, and triage carries on. The customer reply then advises against sending such values.
+- Secrets in **log lines** are masked and flagged the same way by default, since the lab masks its own logs and a secret there means something slipped through. Set `LOG_SECRETS=refuse` to stop instead.
+- Whatever the settings, the whole prompt is checked again just before it is sent.
 - Ticket and log text is treated as data, never as instructions.
 
 ## Local models
@@ -104,7 +106,7 @@ The worst case is tested: three of the longest runbooks, a 60 KB log snapshot an
 | 12288 | about 3,400 characters | about 10,200 tokens |
 | 16384 | about 5,000 to 5,700 characters | about 13,900 tokens |
 
-Whether a given 14B model fits 12288 or 16384 on a 16 GB card depends on its quantisation, so check VRAM before raising it.
+Whether a given 14B model fits 12288 or 16384 on a 16 GB card depends on its quantisation, so check VRAM before raising it. To run Ollama on a different machine, such as a Windows PC with a GPU, see [docs/ollama-on-another-machine.md](docs/ollama-on-another-machine.md).
 
 ## Latest scores
 

@@ -59,6 +59,13 @@ class ClaudeBackend(Backend):
         except anthropic.APIStatusError as exc:
             raise BackendError(f"The Claude API returned {exc.status_code}: {exc.message}") from None
 
+        usage = getattr(response, "usage", None)
+        iterations = getattr(usage, "iterations", None) or []
+        self.last_stats = {
+            "model_served": getattr(response, "model", self.model),
+            "input_tokens": getattr(usage, "input_tokens", None), "output_tokens": getattr(usage, "output_tokens", None),
+            "stop_reason": response.stop_reason, "refusal_fallback_ran": any(getattr(i, "type", "") == "fallback_message" for i in iterations),
+        }
         if response.stop_reason == "refusal":
             category = getattr(getattr(response, "stop_details", None), "category", None)
             raise Refused(f"Claude declined to answer (category: {category or 'unspecified'}).")

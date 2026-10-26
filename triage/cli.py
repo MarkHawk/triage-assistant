@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import sys
+import time
 from pathlib import Path
 
 from .answer import render
@@ -44,8 +46,36 @@ def cmd_retrieve(args: argparse.Namespace) -> int:
     return 0
 
 
+def footer(backend, result, seconds: float, config) -> str:
+    """One line for the engineer about how the answer was made. Goes to stderr."""
+    parts = [f"{backend.name}" + (f" {backend.model}" if backend.model else ""), f"mode {result.mode}"]
+    if backend.name == "ollama":
+        parts.append(f"num_ctx {config.ollama_num_ctx}")
+    parts.append(f"{seconds:.1f}s")
+    if result.prompt is not None:
+        parts.append(f"prompt estimated {result.prompt.estimated_tokens} tokens")
+    if result.attempts:
+        parts.append(f"{result.attempts} request{'s' if result.attempts != 1 else ''}")
+    if result.attempts > 1:
+        parts.append("RETRIED: first answer broke the rules")
+    if result.code_fallback:
+        parts.append("CODE FALLBACK: answer built by code")
+    for key, value in result.stats.items():
+        if value not in (None, "", 0, False) or key == "refusal_fallback_ran":
+            parts.append(f"{key}={value}")
+    if result.answer.source == "offline":
+        parts.append("no model used")
+    return "[" + "; ".join(parts) + "]"
+
+
 def cmd_ticket(args: argparse.Namespace) -> int:
     config = load_config()
+    if args.model:  # one flag for whichever backend is in use
+        config = dataclasses.replace(config, ollama_model=args.model, claude_model=args.model)
+    if args.num_ctx:
+        if config.ollama_reserve_output_tokens >= args.num_ctx:
+            raise ConfigError("--num-ctx must be larger than OLLAMA_RESERVE_OUTPUT_TOKENS")
+        config = dataclasses.replace(config, ollama_num_ctx=args.num_ctx)
     guard = Guard.for_lab(config.lab_dir)
     backend = make_backend(config, guard, args.backend)
     company, systems = load_names(config.lab_dir)
@@ -54,10 +84,11 @@ def cmd_ticket(args: argparse.Namespace) -> int:
     else:
         ticket = parse_ticket(args.text if args.text else sys.stdin.read())
     logs = "\n".join(part for part in (ticket.log_excerpt, Path(args.logs).read_text(encoding="utf-8") if args.logs else "") if part)
+    started = time.monotonic()
     try:
         result = run_triage(ticket.text, logs, backend=backend, retriever=build_retriever(config.lab_dir),
                             scenarios=load_scenarios(config.lab_dir), guard=guard,
-                            system_text=load_system(company, systems))
+                            system_text=load_system(company, systems), log_secrets=config.log_secrets)
     except SecretFound as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 3
@@ -65,6 +96,7 @@ def cmd_ticket(args: argparse.Namespace) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 4
     print(render(result.answer, result.flags), end="")
+    print(footer(backend, result, time.monotonic() - started, config), file=sys.stderr)
     if args.record and result.raw is not None and result.prompt is not None:
         demo = DemoBackend(guard, backend.budget)
         path = demo.record(result.prompt, result.raw, backend.name, backend.model)
@@ -85,6 +117,8 @@ def main(argv: list[str] | None = None) -> int:
     t.add_argument("--text", help="the ticket text")
     t.add_argument("--logs", help="a file of log lines")
     t.add_argument("--backend", choices=["claude", "ollama", "demo"], help="override BACKEND from .env")
+    t.add_argument("--model", help="model name for this run, overriding OLLAMA_MODEL / CLAUDE_MODEL")
+    t.add_argument("--num-ctx", type=int, help="Ollama context window for this run, overriding OLLAMA_NUM_CTX")
     t.add_argument("--record", action="store_true", help="save the answer for demo mode")
     t.set_defaults(func=cmd_ticket)
     args = parser.parse_args(argv)

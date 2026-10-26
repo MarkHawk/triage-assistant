@@ -59,6 +59,11 @@ class OllamaBackend(Backend):
         except urllib.error.URLError as exc:
             raise BackendError(f"Could not reach Ollama at {self.host}: {exc.reason}") from None
         self._used = True
+        self.last_stats = {
+            "prompt_tokens_read": data.get("prompt_eval_count"), "answer_tokens": data.get("eval_count"),
+            "model_load_s": round(data.get("load_duration", 0) / 1e9, 1), "num_ctx": self.num_ctx,
+            "done_reason": data.get("done_reason"),
+        }
 
         read = data.get("prompt_eval_count")
         if isinstance(read, int) and read >= self.num_ctx - TRUNCATION_MARGIN:
