@@ -1,0 +1,29 @@
+# Copy this file to tests/real_tickets.yaml and write your own tickets (about 20).
+#
+#   id:               a short unique label
+#   text:             the ticket as the customer wrote it (no log lines: the runner sends none)
+#   expect.runbook:   the runbook a good engineer would open first. A number (15), a list of
+#                     numbers when more than one is acceptable ([6, 10]), or null when no runbook
+#                     fits (a password reset, an old bookmark, something unrelated)
+#   expect.mode:      optional. diagnose = the ticket says enough to name a cause;
+#                     clarify = a good engineer would ask questions first.
+#                     If left out: diagnose when a runbook is expected, clarify when none is.
+#   note:             optional, for you; shown in the report
+#
+# Use fictional names and companies only. Do not paste real tokens, passwords or addresses.
+# Do not tune retrieval, phrases or prompts against this file before you have reviewed a first run.
+
+tickets:
+  - id: t01
+    text: |
+      Since this morning the Northgate Expenses page keeps reloading itself and then the browser
+      says the site redirected me too many times. Clearing cookies did not help.
+    expect:
+      runbook: 15
+      mode: diagnose
+
+  - id: t02
+    text: "I forgot my password and the reset email never arrives."
+    expect:
+      runbook: null
+    note: out of scope for the lab; a good answer says so plainly
