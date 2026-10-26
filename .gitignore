@@ -1,0 +1,15 @@
+# Secrets and local settings, never commit
+.env
+.private-terms
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Runtime caches (the runbook index is rebuilt from the lab)
+.cache/
+
+# Raw evidence captured during break-it runs may hold lab logs
+results/evidence/
