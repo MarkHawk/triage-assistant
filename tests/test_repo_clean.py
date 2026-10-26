@@ -13,8 +13,10 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 IPV4 = re.compile(r"(?<![\d.])(\d{1,3}(?:\.\d{1,3}){3})(?![\d.])")
-# loopback, the lab's compose subnets, and the documentation ranges
-ALLOWED_IP = re.compile(r"^(127\.|0\.0\.0\.0$|172\.30\.18\d\.|192\.0\.2\.|198\.51\.100\.|203\.0\.113\.)")
+# loopback, the lab's compose subnets, Docker's own private container networks (172.16.0.0/12, which
+# appear in the lab's logs as 172.18.0.x), and the documentation ranges. Home-network ranges (192.168.x,
+# 10.x) are deliberately not allowed.
+ALLOWED_IP = re.compile(r"^(127\.|0\.0\.0\.0$|172\.(1[6-9]|2\d|3[01])\.|192\.0\.2\.|198\.51\.100\.|203\.0\.113\.)")
 HOME_PATH = re.compile(r"(?:/home/|/Users/|C:\\Users\\)[A-Za-z0-9_.-]+")
 
 
@@ -50,3 +52,10 @@ def test_file_is_clean(name, text):
     # LICENSE carries the same copyright holder line as identity-lab, on purpose.
     hits = [] if name == "LICENSE" else [t for t in private_terms() if t.lower() in lowered]
     assert not hits, f"{name}: contains {len(hits)} term(s) from .private-terms"
+
+
+def test_the_address_check_rejects_home_network_ranges_but_allows_docker_and_lab_ones():
+    for ok in ("127.0.0.1", "172.18.0.9", "172.30.182.10", "172.31.255.1", "192.0.2.10"):
+        assert ALLOWED_IP.match(ok), ok
+    for bad in ("192.168.1.10", "10.0.0.5", "172.32.0.1", "172.15.0.1", "8.8.8.8"):
+        assert not ALLOWED_IP.match(bad), bad
