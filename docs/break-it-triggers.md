@@ -35,6 +35,16 @@ docker compose --project-directory <lab> run --rm \
   `tests` image already built (`scripts/test.sh` builds it).
 - Each trigger takes a few seconds, except `oidc-api-late`, which waits 15 s by
   design. That scenario's trigger is `oidc-api-late`; `api-bearer-expired` uses it.
-- Not yet tried: a trigger against a broken scenario. That means a real
-  `break.sh` and `fix.sh`, which change the lab's runtime state (`.state/`,
-  containers), so it waits for approval.
+- Tried against a broken scenario too, on `redirect-loop` (a proxy-only change):
+
+  | Step | Result | Time |
+  |---|---|---|
+  | `scripts/break.sh redirect-loop` | broken | 2.2 s |
+  | trigger `oidc-edge --expect-error ERR_TOO_MANY_REDIRECTS` | pass | 1.9 s |
+  | `docker compose logs --timestamps --since 5m` snapshot | 1097 lines, 21 `force_https` | 0.4 s |
+  | `scripts/fix.sh redirect-loop` | healthy | 2.2 s |
+  | trigger `oidc-edge --expect ok` | pass | 2.4 s |
+  | `scripts/status.sh` | all 21 scenarios healthy | |
+
+  `git status` in the lab stayed clean. A whole cycle for a proxy scenario is
+  about 10 seconds of lab time; the assistant's own wait comes on top.
