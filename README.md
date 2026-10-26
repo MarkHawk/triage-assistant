@@ -2,7 +2,7 @@
 
 An AI support-triage assistant for [identity-lab](../identity-lab), a self-contained single sign-on lab that can be broken on purpose. It plays the IT support desk of a fictional company, Northgate Supplies, and works from the lab's runbooks.
 
-> **Status: work in progress.** Done so far: configuration, the secrets guard, the lab scenario reader, the repository checks, and runbook retrieval that works from plain language. The model backends, ticket mode, watch mode and the evals arrive in later sessions.
+> **Status: work in progress.** Done so far: configuration, the secrets guard, the lab scenario reader, the repository checks, runbook retrieval that works from plain language, and ticket mode with Claude, Ollama and demo backends. Watch mode and the evals arrive in later sessions. The Claude and Ollama backends are tested against fakes only: no live model has been called yet.
 
 Built with AI-assisted tooling (Claude Code).
 
@@ -59,6 +59,28 @@ Be careful reading the last column. After the first run I fixed what the failure
 
 **It stops being independent evidence the moment anything is tuned against it.** If that ever happens, say so here and stop quoting the score as held-out.
 
+## Ticket mode
+
+```bash
+python -m triage ticket tickets/001.md                       # a ticket file (see triage/tickets.py)
+python -m triage ticket --text "The portal goes round in circles"
+python -m triage ticket 001.md --logs lab.log --backend ollama
+python -m triage ticket 001.md --backend claude --record     # also save the answer for demo mode
+```
+
+A ticket file is the customer's message, with an optional `## Log excerpt` section. Only its subject and body reach a model, never the other header fields.
+
+**Two modes, chosen by how well the runbooks match:**
+
+- **Diagnose** (at least one *strong* match): the answer may state the likely cause, with the log lines that prove it quoted word for word, the matching runbook, fix steps and a draft reply.
+- **Clarify** (only weak matches, or none): the answer **asserts no cause**. It asks 3 to 6 questions drawn from the weak runbooks' symptoms and "Questions I'd ask the customer", and mentions those runbooks only as conditions ("if the symptoms match ..., runbook 15 may apply"). The code checks this: an answer with a cause, a fix, a confidence above low or "the cause is ..." wording is sent back once with the reasons, then replaced by an answer built by code. With the demo backend, clarify answers are built by code and no model is used.
+
+Whatever a model returns is checked before you see it: quoted evidence that is not in the supplied text is dropped, the runbook is derived from the outcome rather than taken from the model, and confidence is capped when the evidence is thin.
+
+**Demo mode** (`BACKEND=demo`, the default) needs no key and no GPU. Clarify answers are built by code. Diagnose answers are replayed from `demo/answers/`, saved by `--record` after a real run, and keyed by the ticket, the logs and the retrieved runbooks, so changing the prompt does not orphan them. None are saved yet.
+
+**Claude** uses structured output (not a forced tool choice, which Claude Sonnet 5.5 rejects). If the API declines a request it can re-run it on a fallback model (`CLAUDE_REFUSAL_FALLBACK=1`, the default).
+
 ## Safety
 
 - A secret in lab logs, or any value from the lab's own `.env`, is a hard refusal: nothing is sent to a model.
@@ -67,7 +89,22 @@ Be careful reading the last column. After the first run I fixed what the failure
 
 ## Local models
 
-For a model of about 14B parameters on a 16 GB GPU, `OLLAMA_NUM_CTX` is sent with every request and the prompt is budgeted to fit (`OLLAMA_NUM_CTX` minus `OLLAMA_RESERVE_OUTPUT_TOKENS`), so Ollama never truncates silently. Timeouts are separate for the first request, which includes loading the model.
+For a model of about 14B parameters on a 16 GB GPU, `OLLAMA_NUM_CTX` is sent with every request, and the prompt is budgeted to fit it (`OLLAMA_NUM_CTX` minus `OLLAMA_RESERVE_OUTPUT_TOKENS`). Nothing is cut silently:
+
+- The ticket, the log snapshot and each runbook extract are trimmed to the budget, error-like log lines first, and every cut is reported above the answer.
+- Sizes are estimated on the cautious side (3 characters a token for prose, 2.5 for logs and runbooks). The reply is also checked: if Ollama reports it read almost the whole window, that is an error, because it probably cut the prompt.
+- An answer cut off by the length cap is an error too.
+- The first request has its own, longer timeout (`OLLAMA_FIRST_TIMEOUT_S`) because it may load the model into the GPU.
+
+The worst case is tested: three of the longest runbooks, a 60 KB log snapshot and a very long ticket, at windows of 8192, 12288 and 16384 tokens. It fits, but the window decides how much of each runbook the model sees (the runbooks run up to about 10,000 characters):
+
+| `OLLAMA_NUM_CTX` | Each runbook extract, worst case | Prompt estimate |
+|---|---|---|
+| 8192 | about 2,000 characters | about 6,300 tokens |
+| 12288 | about 3,400 characters | about 10,200 tokens |
+| 16384 | about 5,000 to 5,700 characters | about 13,900 tokens |
+
+Whether a given 14B model fits 12288 or 16384 on a 16 GB card depends on its quantisation, so check VRAM before raising it.
 
 ## Latest scores
 
