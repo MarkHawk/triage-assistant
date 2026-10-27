@@ -13,13 +13,14 @@ from triage.pipeline import run_triage
 from triage.prompt import CLAUDE_BUDGET, load_system
 from triage.scenarios import load_scenarios
 from triage.tickets import load_ticket
+from helpers import lab_dir
 
 FIXTURES = REPO_ROOT / "demo" / "fixtures"
 
 
 @pytest.fixture(scope="module")
 def world():
-    lab = load_config(environ={}).lab_dir
+    lab = lab_dir()
     if not (lab / "runbooks").is_dir():
         pytest.skip("identity-lab not found at LAB_DIR")
     company, systems = load_names(lab)

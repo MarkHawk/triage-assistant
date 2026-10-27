@@ -4,6 +4,7 @@ import pytest
 
 from triage.config import load_config
 from triage.scenarios import load_scenarios, parse_scenario
+from helpers import lab_dir
 
 SAMPLE = '''# shellcheck shell=bash disable=SC2034
 # a comment
@@ -39,7 +40,7 @@ def test_missing_field_is_an_error(tmp_path):
 
 
 def test_every_real_scenario_parses_and_has_a_runbook():
-    lab = load_config(environ={}).lab_dir
+    lab = lab_dir()
     if not (lab / "scenarios").is_dir():
         pytest.skip("identity-lab not found at LAB_DIR")
     scenarios = load_scenarios(lab)
@@ -51,7 +52,7 @@ def test_every_real_scenario_parses_and_has_a_runbook():
 def test_every_real_scenario_has_a_service_and_a_pattern_that_compiles():
     import re
 
-    lab = load_config(environ={}).lab_dir
+    lab = lab_dir()
     if not (lab / "scenarios").is_dir():
         pytest.skip("identity-lab not found at LAB_DIR")
     for s in load_scenarios(lab).values():

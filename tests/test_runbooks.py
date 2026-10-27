@@ -2,6 +2,7 @@ import pytest
 
 from triage.config import load_config
 from triage.runbooks import load_runbooks, parse_runbook
+from helpers import lab_dir
 
 SAMPLE = """# 07 · Reverse proxy: 504 Gateway Time-out
 
@@ -56,7 +57,7 @@ def test_excerpt_fits_and_keeps_fences_balanced(tmp_path):
 
 @pytest.fixture(scope="module")
 def lab_runbooks():
-    lab = load_config(environ={}).lab_dir
+    lab = lab_dir()
     if not (lab / "runbooks").is_dir():
         pytest.skip("identity-lab not found at LAB_DIR")
     return load_runbooks(lab)

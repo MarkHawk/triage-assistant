@@ -34,6 +34,7 @@ import pytest  # noqa: E402
 
 from triage.cli import build_retriever  # noqa: E402
 from triage.config import load_config  # noqa: E402
+from helpers import lab_dir
 
 FLOOR = 23
 
@@ -53,7 +54,7 @@ def cold_correct(retriever):
 
 
 def test_cold_set_regression_floor():
-    lab = load_config(environ={}).lab_dir
+    lab = lab_dir()
     if not (lab / "runbooks").is_dir():
         pytest.skip("identity-lab not found at LAB_DIR")
     right, missed = cold_correct(build_retriever(lab))

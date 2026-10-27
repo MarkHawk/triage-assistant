@@ -8,6 +8,7 @@ from triage.cli import build_retriever
 from triage.config import REPO_ROOT, load_config
 from triage.retrieval import Retriever, stem, terms, words
 from triage.runbooks import load_runbooks, parse_runbook
+from helpers import lab_dir
 
 QUERIES = yaml.safe_load((REPO_ROOT / "tests" / "retrieval_queries.yaml").read_text())
 
@@ -25,7 +26,7 @@ def test_stemmer_meets_inflections():
 
 @pytest.fixture(scope="module")
 def retriever():
-    lab = load_config(environ={}).lab_dir
+    lab = lab_dir()
     if not (lab / "runbooks").is_dir():
         pytest.skip("identity-lab not found at LAB_DIR")
     return build_retriever(lab)
@@ -91,7 +92,7 @@ def test_lab_error_text_is_strong_evidence(retriever):
 
 def test_scenario_log_patterns_hit_their_runbook(retriever):
     """Each SCENARIO_LOG pattern, matched against a real sample line from its own runbook."""
-    lab = load_config(environ={}).lab_dir
+    lab = lab_dir()
     checked, wrong = 0, []
     for scenario in retriever.scenarios.values():
         pattern = re.compile(scenario.log_pattern)
@@ -112,7 +113,7 @@ def test_the_event_rule_alone_finds_force_https():
     The retriever here has no scenarios, so only the rule that ties a log line's event= name to
     the runbooks describing it can supply the answer. Removing the rule fails this.
     """
-    lab = load_config(environ={}).lab_dir
+    lab = lab_dir()
     if not (lab / "runbooks").is_dir():
         pytest.skip("identity-lab not found at LAB_DIR")
     bare = Retriever(load_runbooks(lab), scenarios={})

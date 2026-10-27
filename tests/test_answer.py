@@ -280,6 +280,7 @@ def test_different_words_still_fail_to_verify():
 # --- the cause line must describe the diagnosed runbook --------------------------------------------------
 
 from triage.answer import cause_agrees  # noqa: E402
+from helpers import lab_dir
 
 
 @pytest.fixture(scope="module")
@@ -287,7 +288,7 @@ def causes():
     from triage.config import load_config
     from triage.runbooks import load_runbooks
 
-    lab = load_config(environ={}).lab_dir
+    lab = lab_dir()
     if not (lab / "runbooks").is_dir():
         pytest.skip("identity-lab not found at LAB_DIR")
     return {n: b.cause_statement + "\n" + b.title for n, b in load_runbooks(lab).items()}

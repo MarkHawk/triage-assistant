@@ -4,7 +4,7 @@ import json
 
 import pytest
 import yaml
-from helpers import runbook_cause
+from helpers import lab_dir, runbook_cause
 
 from triage.answer import clarify_violations, Context
 from triage.backends.base import Backend, BackendError
@@ -28,7 +28,7 @@ LOOP_LOG = "2026-10-22 08:44:57,240 INFO oidc-rp-edge event=force_https path=/ s
 
 @pytest.fixture(scope="module")
 def world():
-    lab = load_config(environ={}).lab_dir
+    lab = lab_dir()
     if not (lab / "runbooks").is_dir():
         pytest.skip("identity-lab not found at LAB_DIR")
     company, systems = load_names(lab)

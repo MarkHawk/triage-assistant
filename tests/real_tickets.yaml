@@ -1,0 +1,197 @@
+# Imagined tickets for end-to-end evaluation (ticket text only, no logs).
+# No real customers, names or companies. Run ONCE; do not tune before review.
+# expect.runbook: number, list of acceptable numbers (first is preferred), or null.
+
+tickets:
+- id: t01
+  text: 'Subject: SSO down - urgent
+
+
+    Hi, since around 08:15 none of our staff can get into Northgate Payroll through SSO. They put their password in, do the MFA prompt, then get an error on the payroll side. Our IdP admin says nothing has changed in months. Payroll runs Thursday so this is urgent.'
+  expect:
+    runbook:
+    - 1
+    - 2
+    mode: clarify
+  note: whole-org outage after successful IdP login, no error text
+- id: t02
+  text: 'Subject: Login error after hosting move
+
+
+    We migrated the HR portal to new servers at the weekend and its address has changed. Now when users click Sign in they get a grey page saying "We are sorry... Invalid parameter: redirect_uri". People still have the old address bookmarked, if that matters.'
+  expect:
+    runbook: 3
+    mode: diagnose
+  note: exact error text plus a red-herring bookmark
+- id: t03
+  text: 'Subject: Staff wifi authentication broken
+
+
+    We replaced our old wireless controller with a new one on Monday. Staff can''t join the staff SSID, the controller just says the RADIUS server timed out. Guest wifi is fine. Can you check your RADIUS server is actually up?'
+  expect:
+    runbook: 5
+    mode: diagnose
+  note: customer blames the server; shared secret not mentioned
+- id: t04
+  text: 'Subject: Passwords being rejected
+
+
+    Users are being told their password is wrong when they log in through SSO, but the same passwords work fine on their Windows PCs. Our IT admin can still get into the IdP console with his admin account. Did you change something your end?'
+  expect:
+    runbook: 4
+    mode: clarify
+  note: LDAP bind failure described as a password problem
+- id: t05
+  text: 'Subject: Intermittent SSO failures
+
+
+    About one login in three fails with "Could not validate timestamp: expired". Retrying usually works. We have two app servers behind a load balancer.'
+  expect:
+    runbook: 2
+    mode: diagnose
+  note: one node with bad clock
+- id: t06
+  text: 'Subject: Bad gateway for some finance users
+
+
+    Since the network team changed the reverse proxy config yesterday, some of our finance team get "502 Bad Gateway" when the login page should appear. It''s always the same four people; everyone else is fine. Those four are members of a lot of groups, not sure if that''s relevant.'
+  expect:
+    runbook:
+    - 10
+    - 6
+    mode: diagnose
+  note: header too large; the group hint is the real clue
+- id: t07
+  text: 'Subject: Portal down?
+
+
+    Customers are getting 502 Bad Gateway on the portal. The dev team swears the app is up and their monitoring is all green.'
+  expect:
+    runbook:
+    - 6
+    - 10
+    mode: diagnose
+  note: generic 502
+- id: t08
+  text: 'Subject: Login very slow then fails
+
+
+    When I sign in it accepts my password, then the page spins for a while and I get "Gateway Time-out". If I try again later it sometimes works.'
+  expect:
+    runbook: 7
+    mode: diagnose
+  note: 504, user blames the IdP
+- id: t09
+  text: 'Subject: Can''t log in - too many requests
+
+
+    Everyone in the office was fine first thing, but from about half nine nobody can sign in, the screen says 429 Too Many Requests. We''re a small office of 40 people, we''re not hammering anything.'
+  expect:
+    runbook: 8
+    mode: diagnose
+  note: rate limit
+- id: t10
+  text: 'Subject: Two SSO problems since load balancer install
+
+
+    Two issues since the new load balancer went in front of the IdP. Our SAML app gets "Invalid Request" straight away, and the OIDC apps send users to an address with :443 in it that doesn''t load. Might be two separate problems.'
+  expect:
+    runbook: 9
+    mode: diagnose
+  note: forwarded headers; customer splits it into two issues
+- id: t11
+  text: 'Subject: Your IdP is rejecting our token requests
+
+
+    Our application''s backend can''t complete SSO any more. The app log says "Tunnel connection failed: 407 Proxy Authentication Required" when it calls the token URL. Please whitelist our IP, your IdP must be blocking us.'
+  expect:
+    runbook: 11
+    mode: diagnose
+  note: egress proxy auth; wrong guess about the IdP
+- id: t12
+  text: 'Subject: IdP certificate invalid?
+
+
+    Since Monday our app server says the IdP''s certificate is untrusted (CERTIFICATE_VERIFY_FAILED, self-signed certificate in chain). I''ve checked the IdP certificate in Chrome and it''s valid until 2027. Security rolled out new web filtering last week.'
+  expect:
+    runbook:
+    - 13
+    - 1
+    mode: diagnose
+  note: TLS interception; web filtering is the clue
+- id: t13
+  text: 'Subject: DNS issue on app server?
+
+
+    After we redeployed the app container this morning, login fails immediately and the app log says it can''t resolve the identity provider''s hostname. Nothing changed in the code. Is your DNS down?'
+  expect:
+    runbook: 14
+    mode: diagnose
+  note: NO_PROXY bypass presented as DNS
+- id: t14
+  text: 'Subject: Timesheet app keeps reloading
+
+
+    The new timesheet app just keeps reloading and then Chrome says the page isn''t working because it redirected too many times. We''ve cleared cookies and tried incognito. It works if the developer opens it directly on the server.'
+  expect:
+    runbook: 15
+    mode: diagnose
+  note: redirect loop
+- id: t15
+  text: 'Subject: Dashboard won''t load data
+
+
+    Login is fine, I can see my name in the top corner, but every panel on the dashboard says "Failed to load". It works for about five minutes after I log in, then breaks until I log out and back in.'
+  expect:
+    runbook:
+    - 16
+    - 19
+    mode: clarify
+  note: expired bearer token; no status code given
+- id: t16
+  text: 'Subject: Maintenance page still showing
+
+
+    We''re getting your "Sign-in is down for planned maintenance" page, but your status email said the work finished at 6am. It''s now 11.'
+  expect:
+    runbook: 17
+    mode: diagnose
+  note: maintenance mode left on
+- id: t17
+  text: 'Subject: Integration failing with 400
+
+
+    Our nightly integration started failing last night with HTTP 400 Bad Request from your API. Nothing has changed on our side. Postman from my laptop also gets 400.'
+  expect:
+    runbook:
+    - 18
+    - 16
+    mode: clarify
+  note: client cert expired; certificate never mentioned
+- id: t18
+  text: 'Subject: Works in Postman, not in our web app
+
+
+    Our single-page app shows "Failed to fetch" when calling your API, but exactly the same request in Postman returns data. Your status page is green.'
+  expect:
+    runbook: 19
+    mode: diagnose
+  note: CORS
+- id: t19
+  text: 'Subject: Locked out
+
+
+    I typed my password wrong too many times and now I''m locked out. Can you unlock me please?'
+  expect:
+    runbook: null
+    mode: clarify
+  note: account lockout is not a lab fault
+- id: t20
+  text: 'Subject: SSO not working
+
+
+    SSO isn''t working. Please fix ASAP.'
+  expect:
+    runbook: null
+    mode: clarify
+  note: no information at all; must ask, not guess

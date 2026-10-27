@@ -1,6 +1,6 @@
 import pytest
 import yaml
-from helpers import runbook_cause
+from helpers import lab_dir, runbook_cause
 
 from evals import real_tickets as rt
 from triage.backends.base import Backend, BackendError
@@ -82,7 +82,7 @@ class Scripted(Backend):
 
 @pytest.fixture(scope="module")
 def world():
-    lab = load_config(environ={}).lab_dir
+    lab = lab_dir()
     if not (lab / "runbooks").is_dir():
         pytest.skip("identity-lab not found at LAB_DIR")
     company, systems = load_names(lab)

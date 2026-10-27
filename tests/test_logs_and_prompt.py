@@ -7,6 +7,7 @@ from triage.prompt import (CLAUDE_BUDGET, LOG_CHARS_PER_TOKEN, MEASURED, PROSE_C
                            Budget, build_prompt, load_system, neutralise, tokens)
 from triage.retrieval import Match
 from triage.runbooks import load_runbooks
+from helpers import lab_dir
 
 
 def test_collapse_repeats_ignores_timestamps():
@@ -52,10 +53,10 @@ def test_tags_in_untrusted_text_are_neutralised():
 
 @pytest.fixture(scope="module")
 def lab():
-    lab_dir = load_config(environ={}).lab_dir
-    if not (lab_dir / "runbooks").is_dir():
+    lab_path = lab_dir()
+    if not (lab_path / "runbooks").is_dir():
         pytest.skip("identity-lab not found at LAB_DIR")
-    return lab_dir
+    return lab_path
 
 
 @pytest.fixture(scope="module")
