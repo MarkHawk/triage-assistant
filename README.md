@@ -169,7 +169,7 @@ Latest score for each evaluation, backend and model. Window 12288 throughout.
 
 | Evaluation | Backend and model | Date | Result |
 |---|---|---|---|
-| Real tickets: 20 written by the author, ticket text only | Ollama `qwen2.5:14b` | 2026-10-27 | retrieval right 20/20, mode right 19/20, cause right 15/15 of those diagnosed, answers breaking a reply rule 0/15 |
+| Real tickets: 20 written by the author (`tests/real_tickets.yaml`), ticket text only | Ollama `qwen2.5:14b` | 2026-10-27 | retrieval right 20/20, mode right 19/20, cause right 15/15 of those diagnosed, answers breaking a reply rule 0/19; 10 needed a second request and 7 were corrected by code |
 | Lab scenarios: 7 cases broken in the lab, scoped logs, 3 runs each | Ollama `qwen2.5:14b` | 2026-10-26 | scenario right 21/21 |
 | Lab scenarios: the same | Ollama `qwen2.5-coder:14b` | 2026-10-26 | scenario right 12/21 |
 | Retrieval cold set: 24 queries, no model | none | 2026-10-26 | 23/24 |

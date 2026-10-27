@@ -164,3 +164,68 @@ Earlier in this document I counted run A as 15 of 15 answers breaking a rule. Ju
 
 - **The identity provider is ours only if the ticket says so.** t02's reply says "Please check the registered redirect URI in the identity provider". As the vendor of the sign-in service, the identity provider is ours, but the ticket never says "your IdP", so the ownership check cannot tell. A fix would treat the identity provider and the sign-in service as ours by default in vendor mode.
 - **t18 asks for a screenshot of the browser's Network tab.** That is not asking for a secret in words, but a Network tab screenshot can show cookies and tokens. The secrets rule does not catch it.
+
+# Fourth round, and run D (2026-10-27)
+
+Changes since run C, made after reviewing it:
+
+| # | Change |
+|---|---|
+| 15 | The confirming question must ask about something the ticket does not already state. A prompt rule with an example (t02 asked whether the URL had changed; t09 asked whether it was a 429 or a 503) |
+| 16 | One persona and one sign-off for every reply, whichever mode or source made it. The model no longer signs off; code adds "Sign-in service support" in vendor mode, or "<company> IT Support" in internal mode (`SUPPORT_SIGNOFF` overrides). The system prompt's opening line follows the persona too: in vendor mode it no longer says it is Northgate's IT desk |
+| 17 | Never ask for a screenshot of the Network tab, a HAR file or request headers, which can carry cookies and tokens; ask for the console error text and the status code instead. Part of the secrets rule. Runbook sentences that ask for these (runbook 19 asks for a Network tab screenshot) are left out of the extracts the model sees; the runbooks themselves are untouched |
+| 18 | `VENDOR_OWNS` (default: sign-in service, identity provider, API) lists what is ours in vendor mode when the ticket does not say "your". What the ticket calls "our ..." still wins |
+| 19 | The ticket file gained a header saying it is fictional, so its hash changed from `3b953480b286` to `d5c9c4c6f211`. No ticket changed |
+
+Every column is judged by **today's** rules, which are stricter than when B and C were reported (they now include the Network tab rule and `VENDOR_OWNS`), and clarify answers are included. That is why B and C show more breaks here than in the tables above.
+
+| Id | Expected | A | B | C | D |
+|---|---|---|---|---|---|
+| t01 | 01, 02 | clarify | clarify | clarify | clarify |
+| t02 | 03 | redirect-uri-mismatch; wording | redirect-uri-mismatch, high; cause | redirect-uri-mismatch; who does what | redirect-uri-mismatch |
+| t03 | 05 | radius-shared-secret-mismatch; secrets, wording | radius-shared-secret-mismatch; who does what | radius-shared-secret-mismatch | radius-shared-secret-mismatch (code corrected) |
+| t04 | 04 | clarify | clarify | clarify | clarify |
+| t05 | 02 | clock-skew; wording | clock-skew | clock-skew | clock-skew |
+| t06 | 10, 06 | proxy-bad-gateway; lab term, wording | proxy-bad-gateway | proxy-bad-gateway | proxy-bad-gateway |
+| t07 | 06, 10 | proxy-bad-gateway; wording | proxy-bad-gateway | proxy-bad-gateway | proxy-bad-gateway |
+| t08 | 07 | proxy-gateway-timeout; wording | proxy-gateway-timeout | proxy-gateway-timeout | proxy-gateway-timeout |
+| t09 | 08 | proxy-rate-limit; lab term, wording | proxy-rate-limit | proxy-rate-limit | proxy-rate-limit |
+| t10 | 09 | proxy-forwarded-headers; lab term, who does what, wording | proxy-forwarded-headers | proxy-forwarded-headers | proxy-forwarded-headers (code corrected) |
+| t11 | 11 | proxy-auth-required; wording | proxy-auth-required; who does what | proxy-auth-required; who does what | proxy-auth-required (code corrected) |
+| t12 | 13, 01 | not_a_lab_fault (**wrong**) | proxy-tls-interception | proxy-tls-interception | proxy-tls-interception (code corrected) |
+| t13 | 14 | proxy-bypass; who does what, wording | proxy-bypass; who does what | proxy-bypass; who does what | proxy-bypass (code corrected) |
+| t14 | 15 | redirect-loop; lab term, wording | redirect-loop | redirect-loop | redirect-loop |
+| t15 | 16, 19 | clarify | clarify | clarify | clarify |
+| t16 | 17 | proxy-maintenance; lab term, wording | proxy-maintenance; who does what | proxy-maintenance, high | proxy-maintenance, high (code corrected) |
+| t17 | 18, 16 | client-cert-missing; who does what, wording | client-cert-missing | client-cert-missing | client-cert-missing |
+| t18 | 19 | cors-blocked; who does what, secrets, wording | cors-blocked; who does what, secrets | cors-blocked; secrets | cors-blocked (code corrected) |
+| t19 | none | clarify | service request | service request | service request |
+| t20 | none | clarify | clarify | clarify | clarify |
+
+| | A | B | C | D |
+|---|---|---|---|---|
+| Retrieval right | 20/20 | 20/20 | 20/20 | 20/20 |
+| Mode appropriate | 19/20 | 19/20 | 19/20 | 19/20 |
+| Cause right (of those diagnosed) | 14/15 | 15/15 | 15/15 | 15/15 |
+| Answers breaking a rule in force today (service requests excluded) | 14/20 | 6/19 | 4/19 | **0/19** |
+| Replies signed "Northgate Supplies IT Support" | 5 | 4 | 4 | **0** |
+| Needed a second request | 0 | 5 | 7 | **10** |
+| Corrected by code after two attempts | 0 | 3 | 2 | **7** |
+| High confidence | 0 | 1 | 1 | 1 (t16, documented text) |
+| Runbook text quoted as evidence | 1 | 2 | 2 | 4 |
+| Other unverified quotes | 2 | 3 | 0 | 0 |
+| Average time per ticket | 11.2 s | 12.7 s | 13.9 s | **16.8 s** |
+
+## What run D shows
+
+- **What you asked about holds.**
+  - t02 now says "We will check this and update the configuration" about the identity provider, and asks "Could you confirm the exact URL users are trying to access", not whether the URL changed.
+  - t09 asks whether the first login of the day works, not whether it was a 429 or a 503.
+  - Every reply ends with "Sign-in service support", clarify answers included.
+  - No reply asks for the Network tab, a HAR file or headers.
+- **It costs more.** The model needed a second request for 10 of 19 answers and code corrected 7, against 7 and 2 in run C, and an answer takes about 17 seconds instead of 14. Most corrections are about who does what (code applied them to t10, t13 and t16) and the hedged wording (t03, t10, t12). Each is flagged above the answer.
+- **Quoting runbook text as evidence went up**, from 2 to 4. Those quotes are labelled and never count as evidence, but the model does it more than before.
+
+## Found in run D, not fixed
+
+- **t09's reply says "Please check if a rate limit was recently added or changed on the proxy".** That reverse proxy is in front of our identity provider, so it is ours, but the ticket does not say so and "proxy" is not in `VENDOR_OWNS`. Adding it there would also claim proxies that belong to customers, such as the egress proxy in t11, so I have left it as it is.
