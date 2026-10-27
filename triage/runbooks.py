@@ -113,3 +113,32 @@ def load_runbooks(lab_dir: Path) -> dict[int, Runbook]:
         raise FileNotFoundError(f"no runbooks folder in the lab at {folder}")
     books = [parse_runbook(p, lab_dir) for p in sorted(folder.glob("[0-9][0-9]-*.md"))]
     return {b.number: b for b in books}
+
+
+_FENCE = re.compile(r"```[^\n]*\n(.*?)```", re.DOTALL)
+_MIN_DOCUMENTED_CHARS = 15
+
+
+def _normal(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip().lower()
+
+
+def documented_lines(books: dict[int, Runbook]) -> dict[int, tuple[str, ...]]:
+    """The error text each runbook documents, from the code blocks of its Symptom section.
+
+    Only lines that can tell one runbook from another are kept: at least 15 characters, not a shell
+    command, and not found anywhere in another runbook's Symptom code blocks, even as part of a longer
+    line (so "502 Bad Gateway", which runbook 06 shows inside its HTML page, cannot name runbook 10).
+    """
+    per_book: dict[int, list[str]] = {}
+    for number, book in books.items():
+        lines = []
+        for block in _FENCE.findall(book.sections.get("Symptom", "")):
+            for raw in block.splitlines():
+                line = raw.strip()
+                if len(line) >= _MIN_DOCUMENTED_CHARS and not line.startswith(("$", "#", "curl ", "http")):
+                    lines.append(line)
+        per_book[number] = lines
+    shown = {n: _normal("\n".join(b for b in _FENCE.findall(book.sections.get("Symptom", "")))) for n, book in books.items()}
+    return {n: tuple(l for l in lines if not any(_normal(l) in text for m, text in shown.items() if m != n))
+            for n, lines in per_book.items()}

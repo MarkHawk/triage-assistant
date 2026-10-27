@@ -78,3 +78,44 @@ def test_real_excerpts_fit_and_keep_the_fix(lab_runbooks, limit):
         assert out.count("```") % 2 == 0, book.path
         assert "## Fix" in out and "## Symptom" in out
         assert book.path in out
+
+
+def test_documented_lines_keep_only_what_tells_one_runbook_from_another(tmp_path):
+    from triage.runbooks import documented_lines
+
+    (tmp_path / "runbooks").mkdir()
+
+    def book(n, symptom):
+        f = tmp_path / "runbooks" / f"{n:02d}-x.md"
+        f.write_text(f"# {n:02d} · T\n\n## Symptom\n\n{symptom}\n\n## Fix\n\nf\n")
+        return n, parse_runbook(f, tmp_path)
+
+    books = dict([book(1, "```\nCould not validate timestamp: expired.\n502 Bad Gateway page here\nshort\n$ curl -I https://example.test/x\n```"),
+                  book(2, "```\nA different distinctive error line\n502 Bad Gateway page here\n```")])
+    lines = documented_lines(books)
+    assert lines[1] == ("Could not validate timestamp: expired.",)  # unique, long enough, not a command
+    assert lines[2] == ("A different distinctive error line",)  # the line both runbooks show is dropped from both
+
+
+def test_a_line_found_inside_another_runbooks_longer_line_does_not_count(tmp_path):
+    from triage.runbooks import documented_lines
+
+    (tmp_path / "runbooks").mkdir()
+
+    def book(n, symptom):
+        f = tmp_path / "runbooks" / f"{n:02d}-x.md"
+        f.write_text(f"# {n:02d} · T\n\n## Symptom\n\n{symptom}\n\n## Fix\n\nf\n")
+        return n, parse_runbook(f, tmp_path)
+
+    books = dict([book(6, "```\n<h1>502 Bad Gateway</h1>\n```"), book(10, "```\n502 Bad Gateway\n```")])
+    assert documented_lines(books)[10] == ()  # "502 Bad Gateway" is part of runbook 06's page as well
+
+
+def test_the_real_runbooks_document_error_text_but_not_the_ambiguous_lines(lab_runbooks):
+    from triage.runbooks import documented_lines
+
+    lines = documented_lines(lab_runbooks)
+    assert "Could not validate timestamp: expired. Check system clock." in lines[2]
+    assert sum(1 for v in lines.values() if v) >= 15
+    shared = {l.lower() for v in lines.values() for l in v}
+    assert "502 bad gateway" not in shared  # runbooks 06 and 10 both show it, so it names neither

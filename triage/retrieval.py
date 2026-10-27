@@ -25,7 +25,7 @@ from pathlib import Path
 import yaml
 
 from .config import REPO_ROOT
-from .runbooks import Runbook
+from .runbooks import Runbook, documented_lines
 from .scenarios import Scenario
 
 _WORD = re.compile(r"[a-z0-9]+")
@@ -131,6 +131,7 @@ class Retriever:
                  phrases_path: Path | None = None, vocabulary: str = ""):
         """vocabulary: extra known words (the company's system names), so they don't count as unknown."""
         self.runbooks = runbooks
+        self.documented = documented_lines(runbooks)  # the error text each runbook shows, unique to it
         self.scenarios = scenarios or {}
         self.entries = _load_entries(phrases_path or REPO_ROOT / "data" / "phrases.yaml")
         self._tf: dict[int, Counter[str]] = {}

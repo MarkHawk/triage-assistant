@@ -83,6 +83,7 @@ class Answer:
     possibilities: list[Possibility]
     warnings: list[str] = field(default_factory=list)
     source: str = "model"  # "model" or "offline" (built by code, no model)
+    kind: str = "answer"  # "answer", or "service_request" for an account request that is not a fault
     dropped_evidence: list[str] = field(default_factory=list)  # quoted lines that could not be verified
 
     @property
@@ -100,6 +101,10 @@ class Context:
     retrieved: dict[int, tuple[str, str, bool]]  # runbook number -> (path, title, strong)
     user_side_hint: bool = False
     ticket_was_flagged: bool = False
+    persona: str = "vendor"  # "vendor" or "internal"; see rules.py
+    customer_side: tuple[str, ...] = ()  # parts of the customer's own estate the ticket mentions
+    documented: dict[int, tuple[str, ...]] = field(default_factory=dict)  # runbook -> its documented error lines
+    confirming: str = ""  # a question that would confirm the top runbook, for repairs
 
 
 def _clean(text: object) -> str:
@@ -196,14 +201,16 @@ CONTRADICTION = "CONTRADICTION:"
 
 
 def contradictions(answer: Answer, ctx: Context) -> list[str]:
-    """An answer that says "not a lab fault" while giving a cause and verified evidence for a runbook that
-    matched strongly argues against itself. A model once did this nine times in nine, with high confidence."""
+    """An answer of "not a lab fault" when a runbook matched strongly and nothing points to the user's side.
+
+    Earlier a model did this nine times in nine, with high confidence, while its own cause and evidence
+    described the fault. It is flagged even without evidence, because with no logs there is none to check.
+    """
     strong = [n for n, (_, _, is_strong) in ctx.retrieved.items() if is_strong]
-    if (answer.outcome == "not_a_lab_fault" and answer.asserts_cause and answer.evidence
-            and strong and not ctx.user_side_hint):
-        return [f"{CONTRADICTION} the outcome is not_a_lab_fault, but you also gave a cause and quoted evidence, and "
-                f"runbook {strong[0]:02d} matched strongly. If that runbook fits, set the outcome to its scenario name. "
-                "If this really is not a lab fault, remove the cause and the evidence and say why"]
+    if answer.outcome == "not_a_lab_fault" and strong and not ctx.user_side_hint:
+        return [f"{CONTRADICTION} the outcome is not_a_lab_fault, but runbook {strong[0]:02d} matched this ticket strongly "
+                "and nothing in it points to the user's side. If that runbook fits, set the outcome to its scenario name. "
+                "If this really is not a lab fault, say why"]
     return []
 
 
@@ -235,8 +242,21 @@ def clarify_violations(answer: Answer, ctx: Context) -> list[str]:
     return problems
 
 
+def documented_text_quoted(answer: Answer, ctx: Context) -> str | None:
+    """The runbook's documented error line the ticket quotes word for word, if all three conditions hold:
+    the runbook matched strongly, the ticket contains one of its documented lines, and the diagnosed
+    scenario belongs to that runbook."""
+    number = _runbook_number(answer.runbook)
+    info = ctx.retrieved.get(number)
+    if info is None or not info[2]:
+        return None
+    ticket = _squash(ctx.ticket).lower()
+    return next((line for line in ctx.documented.get(number, ()) if _squash(line).lower() in ticket), None)
+
+
 def _correct_diagnosis(answer: Answer, ctx: Context) -> None:
-    verified = bool(answer.evidence)
+    # Only quoted log lines lift the cap. The customer's own words are not evidence that the diagnosis is right.
+    verified = any(e.source == "log" for e in answer.evidence)
     if answer.outcome in ctx.scenario_runbooks:
         number = _runbook_number(answer.runbook)
         info = ctx.retrieved.get(number)
@@ -247,8 +267,13 @@ def _correct_diagnosis(answer: Answer, ctx: Context) -> None:
             answer.confidence = "medium"
             answer.warnings.append("The matching runbook was only a weak match; confidence capped at medium.")
     if not verified and answer.confidence == "high":
-        answer.confidence = "medium"
-        answer.warnings.append("No quoted evidence could be verified; confidence capped at medium.")
+        quoted = documented_text_quoted(answer, ctx)
+        if quoted:
+            answer.warnings.append(f"High confidence without log lines: the ticket quotes the runbook's documented error text "
+                                   f"word for word ({quoted[:80]!r}).")
+        else:
+            answer.confidence = "medium"
+            answer.warnings.append("No quoted log line could be verified; confidence capped at medium.")
 
 
 def _runbook_number(path: str | None) -> int | None:
@@ -271,6 +296,8 @@ def render(answer: Answer, flags: list[str] | None = None) -> str:
         out.append("")
     title = {"needs_more_info": "Needs more information", "not_a_lab_fault": "Not a lab fault"}.get(
         answer.outcome, f"Likely scenario: {answer.outcome}")
+    if answer.kind == "service_request":
+        title = "Service request, not a fault"
     out.append(f"## {title}")
     out.append(f"Confidence: **{answer.confidence}**" + ("  (built by code, no model was used)" if answer.source == "offline" else ""))
     if answer.mode == "clarify":

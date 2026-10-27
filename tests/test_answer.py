@@ -181,16 +181,77 @@ def test_not_a_lab_fault_with_a_cause_and_evidence_for_a_strong_runbook_is_a_con
     assert len(violations) == 1 and violations[0].startswith("CONTRADICTION:") and "runbook 15" in violations[0]
 
 
-@pytest.mark.parametrize("change", [
-    {"evidence": []},                 # no verified evidence
-    {"likely_cause": ""},             # no cause stated
-    {"outcome": "redirect-loop"},     # not the contradictory outcome
-])
-def test_the_contradiction_check_needs_all_of_its_conditions(change):
-    assert check({**CONTRADICTORY, **change}, ctx())[1] == []
+def test_the_contradiction_needs_no_cause_and_no_evidence_only_a_strong_match_and_no_user_side_hint():
+    """With no logs there is no evidence to find; t12 of the real-ticket set was missed for that reason."""
+    for change in ({"evidence": []}, {"likely_cause": ""}, {"evidence": [], "likely_cause": ""}):
+        _, violations = check({**CONTRADICTORY, **change}, ctx())
+        assert len(violations) == 1 and violations[0].startswith("CONTRADICTION:"), change
+
+
+def test_naming_a_scenario_is_not_a_contradiction():
+    assert check({**CONTRADICTORY, "outcome": "redirect-loop"}, ctx())[1] == []
 
 
 def test_the_contradiction_check_stands_down_when_no_runbook_matched_strongly_or_a_user_side_hint_applies():
     weak = {15: ("runbooks/15-redirect-loop.md", "Redirect loop", False)}
     assert check(CONTRADICTORY, ctx(retrieved=weak))[1] == []
     assert check(CONTRADICTORY, ctx(user_side_hint=True))[1] == []
+
+
+# --- high confidence without log lines: three conditions, all needed -------------------------------------
+
+DOC = "Could not validate timestamp: expired. Check system clock."
+CLOCK = {"clock-skew": "runbooks/02-clock-skew.md", "redirect-loop": "runbooks/15-redirect-loop.md"}
+
+
+def high(**kw):
+    base = dict(mode="diagnose", logs="", ticket=f"The portal shows: {DOC} It started today.", scenario_runbooks=CLOCK,
+                retrieved={2: ("runbooks/02-clock-skew.md", "Clock skew", True), 15: ("runbooks/15-redirect-loop.md", "Redirect loop", True)},
+                documented={2: (DOC,), 15: ("This page isn't working here",)})
+    base.update(kw)
+    return Context(**base)
+
+
+def test_high_confidence_without_logs_is_kept_when_all_three_conditions_hold():
+    answer, _ = check(raw(outcome="clock-skew", evidence=[], confidence="high"), high())
+    assert answer.confidence == "high" and any("documented error text word for word" in w for w in answer.warnings)
+
+
+@pytest.mark.parametrize("name,ctx_change,raw_change", [
+    ("the runbook did not match strongly", dict(retrieved={2: ("runbooks/02-clock-skew.md", "Clock skew", False)}), {}),
+    ("the ticket does not quote the documented text", dict(ticket="The portal says something about the time."), {}),
+    ("the ticket quotes only part of it", dict(ticket="It says: Could not validate timestamp"), {}),
+    ("the scenario belongs to a different runbook", {}, dict(outcome="redirect-loop")),
+    ("the runbook has no documented text that is unique to it", dict(documented={2: ()}), {}),
+])
+def test_without_all_three_conditions_it_stays_capped_at_medium(name, ctx_change, raw_change):
+    answer, _ = check(raw(**{"outcome": "clock-skew", "evidence": [], "confidence": "high", **raw_change}), high(**ctx_change))
+    assert answer.confidence in ("medium", "low"), name
+    assert answer.confidence != "high" and not any("documented error text" in w for w in answer.warnings), name
+
+
+def test_the_quote_may_differ_in_case_and_spacing_but_not_in_words():
+    answer, _ = check(raw(outcome="clock-skew", evidence=[], confidence="high"),
+                      high(ticket="could not VALIDATE   timestamp: expired.\nCheck system clock."))
+    assert answer.confidence == "high"
+
+
+def test_verified_log_evidence_still_gives_high_without_any_documented_text():
+    answer, _ = check(raw(), ctx())
+    assert answer.confidence == "high"
+
+
+def test_the_customers_own_words_do_not_count_as_evidence_for_high_confidence():
+    """Run 2 of the real-ticket set found tickets reaching high by quoting themselves."""
+    c = ctx(logs="", ticket="The portal goes round in circles. Chrome says it redirected me too many times.")
+    quoting_the_ticket = raw(evidence=[{"line": "Chrome says it redirected me too many times.", "why": "the customer's words"}])
+    answer, _ = check(quoting_the_ticket, c)
+    assert answer.evidence[0].source == "ticket" and answer.confidence == "medium"
+    assert any("No quoted log line could be verified" in w for w in answer.warnings)
+    with_log, _ = check(raw(), ctx())  # a verified log line still gives high
+    assert with_log.evidence[0].source == "log" and with_log.confidence == "high"
+
+
+def test_a_ticket_quote_plus_the_documented_text_rule_can_still_give_high():
+    answer, _ = check(raw(outcome="clock-skew", evidence=[{"line": DOC, "why": "customer quotes the error"}], confidence="high"), high())
+    assert answer.confidence == "high" and answer.evidence[0].source == "ticket"
