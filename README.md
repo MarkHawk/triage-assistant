@@ -79,18 +79,31 @@ Whatever a model returns is checked before you see it: quoted evidence that is n
 
 **Demo mode** (`BACKEND=demo`, the default) needs no key and no GPU. Clarify answers are built by code. Diagnose answers are replayed from `demo/answers/`, saved by `--record` after a real run, and keyed by the ticket, the logs and the retrieved runbooks, so changing the prompt does not orphan them. Four are saved in `demo/answers/`, with their fixtures in `demo/fixtures/`.
 
-**The demo recordings are the best run per case, not a typical run.** Each is the best of six live runs (three on each of two models, window 12288), chosen for: right answer, no retry, most quoted evidence verified, nothing corrected, then fastest. The model is named in each recording's metadata:
+**The demo recordings are single runs, not averages.** Each case was run on `qwen2.5:14b` at window 12288 (after the post-review rules below) and the first run that passed every rule at its first attempt with nothing corrected was recorded. Each recording's metadata names the model and date.
 
-| Case | Recorded from |
-|---|---|
-| `redirect-loop` (diagnose) | `qwen2.5:14b` |
-| `cors-blocked` (diagnose) | `qwen2.5:14b` |
-| `expired-signing-cert` (diagnose) | `qwen2.5-coder:14b` |
-| printer offline (clarify) | `qwen2.5:14b` |
+| Case | Recorded from | Note |
+|---|---|---|
+| `redirect-loop` (diagnose) | `qwen2.5:14b` | |
+| `expired-signing-cert` (diagnose) | `qwen2.5:14b` | |
+| `cors-blocked` (diagnose) | `qwen2.5:14b` | keeps one quoted line the model could not back up, shown in the engineer section |
+| printer offline (clarify) | `qwen2.5:14b` | |
 
-Cases where a model got the scenario wrong have no recording. See [docs/live-runs-ollama.md](docs/live-runs-ollama.md) for all 42 runs.
+Cases where a model got the scenario wrong have no recording. [docs/live-runs-ollama.md](docs/live-runs-ollama.md) has the earlier 42-run comparison of two models.
 
 **Claude** uses structured output (not a forced tool choice, which Claude Sonnet 5.5 rejects). If the API declines a request it can re-run it on a fallback model (`CLAUDE_REFUSAL_FALLBACK=1`, the default).
+
+## What the assistant will and will not say
+
+These rules are checked in code on every model answer. The model is told once when it breaks one; if it breaks it again, code corrects the answer, and says so above it.
+
+- It never asks the customer for a password, shared secret, key, token or cookie.
+- `SUPPORT_PERSONA=vendor` (the default) says "please check" or "we recommend" about the customer's own servers, proxies and networks, never "we will". `internal` may promise work.
+- Below high confidence the reply says "the most likely cause is" and asks a confirming question. High confidence needs a quoted log line, or a ticket that quotes the runbook's documented error text word for word.
+- Nothing specific to the lab appears in fix steps or replies, and fix steps are actions, not questions.
+- "Not a lab fault" is not accepted when a runbook matched strongly and nothing points to the user's side.
+- Account lockouts and admin requests get a short reply pointing to the account administrator, with no questions and no model.
+
+These came from the first review of the real-ticket set. [docs/post-review-changes.md](docs/post-review-changes.md) lists each change with before-and-after scores.
 
 ## Real-ticket evaluation
 
