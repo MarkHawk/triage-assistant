@@ -1,3 +1,4 @@
+# FICTIONAL: every ticket, person, company and system named in this file is made up for testing.
 # Imagined tickets for end-to-end evaluation (ticket text only, no logs).
 # No real customers, names or companies. Run ONCE; do not tune before review.
 # expect.runbook: number, list of acceptable numbers (first is preferred), or null.
