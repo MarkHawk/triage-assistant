@@ -7,31 +7,20 @@
   "answer": {
     "outcome": "cors-blocked",
     "confidence": "high",
-    "likely_cause": "The 'Access-Control-Allow-Origin' header has a value 'https://idlab.home:8182/' that is not equal to the supplied origin.",
+    "likely_cause": "The 'Access-Control-Allow-Origin' header has a value that does not match the page's origin.",
     "evidence": [
       {
         "line": "Access to fetch at 'https://idlab.home:8188/v1/whoami' from origin 'https://idlab.home:8182' has been blocked by CORS policy: The 'Access-Control-Allow-Origin' header has a value 'https://idlab.home:8182/' that is not equal to the supplied origin. Have the server send the header with a valid value.",
-        "why": "The browser's developer console reports a CORS policy issue."
-      },
-      {
-        "line": "2026-10-26 22:53:45,648 INFO api event=api_cors_preflight origin=https://idlab.home:8182 method=GET headers=authorization",
-        "why": "The API logs a successful preflight request."
-      },
-      {
-        "line": "2026-10-26 22:53:45,680 INFO api event=api_request_ok sub=1e7d717f-82d0-49ab-bb06-c34330a53287 azp=oidc-rp iat=2026-10-26T22:53:45Z exp=2026-10-26T22:58:45Z origin=https://idlab.home:8182 cors_allow_origin=https://idlab.home:8182/",
-        "why": "The API logs a successful API request."
+        "why": "The header value has a trailing slash, which does not match the page's origin."
       }
     ],
     "fix_steps": [
-      "Make the API's Access-Control-Allow-Origin match the page's origin exactly.",
-      "Verify that the same request works from curl or Postman."
+      "Make the API's Access-Control-Allow-Origin match the page's origin exactly, without a trailing slash.",
+      "Verify that the browser's developer console shows no CORS errors and the API call succeeds."
     ],
-    "customer_reply": "The most likely cause is a CORS policy issue where the 'Access-Control-Allow-Origin' header does not match the origin of the page making the call. Please check the browser's developer console for the exact error message and send us a screenshot of the Console and the Network tab for the failing call. We recommend verifying if the same request works from curl or Postman.",
+    "customer_reply": "Thank you for the details. The most likely cause is that the 'Access-Control-Allow-Origin' header has a value that does not match the page's origin. Please check the exact origin of the page making the call and ensure the header matches it exactly, without a trailing slash. Does the same request work from curl or Postman?",
     "questions_for_customer": [
-      "What does the browser's developer console say, word for word? Can you send a screenshot of the Console and the Network tab for the failing call?",
-      "What is the exact origin of the page making the call (the address bar up to the first '/' after the host and port)?",
-      "Does the same request work from curl or Postman?",
-      "In the Network tab, is there an OPTIONS request before the call? What status does it get, and does the call itself appear after it?"
+      "What does the browser's developer console say, word for word?"
     ],
     "possibilities": []
   }

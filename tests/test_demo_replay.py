@@ -41,11 +41,16 @@ def test_each_recorded_diagnosis_replays_with_verified_evidence(world, scenario,
     result = replay(world, f"{scenario}/ticket.md", f"{scenario}/logs.txt")
     assert result.mode == "diagnose" and result.answer.source == "model" and result.attempts == 1
     assert result.answer.outcome == scenario and result.answer.runbook.endswith(runbook)
-    assert result.answer.evidence and all(e.source == "log" for e in result.answer.evidence), result.answer.warnings
-    # recorded from a run that passed every rule at the first attempt: nothing is corrected on replay. The cors-blocked
-    # recording keeps one quote the model could not back up, which shows in the engineer section.
+    # recorded from a run that passed every rule at the first attempt: nothing is corrected on replay
     assert not any(w.startswith("Corrected by code") for w in result.answer.warnings)
-    assert len(result.answer.dropped_evidence) == (1 if scenario == "cors-blocked" else 0)
+    if scenario == "cors-blocked":
+        # the model quotes only the runbook's own console message, never the log line: no verified evidence, medium
+        # confidence, and the dropped quote is labelled as the runbook's example in the engineer section
+        assert result.answer.evidence == [] and result.answer.confidence == "medium"
+        assert result.answer.runbook_quotes == result.answer.dropped_evidence and len(result.answer.runbook_quotes) == 1
+    else:
+        assert result.answer.evidence and all(e.source == "log" for e in result.answer.evidence), result.answer.warnings
+        assert result.answer.dropped_evidence == []
 
 
 def test_printer_clarify_answer_replays_and_asserts_nothing(world):

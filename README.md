@@ -95,7 +95,7 @@ Whatever a model returns is checked before you see it: quoted evidence that is n
 |---|---|---|
 | `redirect-loop` (diagnose) | `qwen2.5:14b` | |
 | `expired-signing-cert` (diagnose) | `qwen2.5:14b` | |
-| `cors-blocked` (diagnose) | `qwen2.5:14b` | keeps one quoted line the model could not back up, shown in the engineer section |
+| `cors-blocked` (diagnose) | `qwen2.5:14b` | quotes only the runbook's own console message, never the log line, so it has no verified evidence and stays at medium; the engineer section labels the quote as the runbook's example |
 | printer offline (clarify) | `qwen2.5:14b` | |
 
 Cases where a model got the scenario wrong have no recording. [docs/live-runs-ollama.md](docs/live-runs-ollama.md) has the earlier 42-run comparison of two models.
