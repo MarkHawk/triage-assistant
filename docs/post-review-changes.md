@@ -108,4 +108,59 @@ No other diagnosed answer is flagged by the new checks.
 
 - **Ownership is read from wording.** It looks for things named after "your", "our", "my" or "the" from a fixed list of nouns (server, API, proxy, page, controller and so on). A generic word such as "page" or "side" in the reply only matches the ticket's full phrase, because "the page" could be anyone's. Something the ticket never names, such as the proxy in t16, is judged from the ticket as a whole: if it names only our things, asking the customer to fix anything is caught.
 - **The code repairs are mechanical.** For example, "Please check the shared secret on both the new controller and the RADIUS server" becomes "We will check the RADIUS server on our side, and we recommend that you check the new controller on yours." It is correct, but it reads like a template. The flag above the answer says when code did it.
-- **The real-ticket set has not been rerun** after this round.
+- **The real-ticket set was rerun once after the third round** (run C below), not after this one on its own.
+
+# Third round, and all three runs side by side (2026-10-27)
+
+Changes since the second round, again made after reading the answers:
+
+| # | Change |
+|---|---|
+| 12 | The worked example in the diagnose prompt is now about a shared calendar, something the lab cannot produce. An answer that copies any part of it naming the calendar or mailbox is caught and repaired. The old example, about certificates, had turned up word for word as t02's cause line |
+| 13 | A dropped quote that is the runbooks' own text (a sample log line, an error page, a symptom description) is labelled "quoted the runbook's own example, not the ticket or logs" in the engineer section, and counted separately in the eval report |
+| 14 | The prompt says: runbook text (sample logs, error pages, symptom descriptions) is reference material, never evidence; evidence must come from the ticket or the supplied logs |
+
+Run C is the one rerun after rounds two and three: same ticket file (hash `3b953480b286`), same model and window, ticket text only. The rule figures apply **today's** rules to each run's saved answers, so all three are judged the same way. Run A had never been told about them.
+
+| Id | Expected | A: before review | B: after round 1 | C: after rounds 2 and 3 |
+|---|---|---|---|---|
+| t01 | 01, 02 | clarify | clarify | clarify |
+| t02 | 03 | redirect-uri-mismatch, medium; wording | redirect-uri-mismatch, **high** by quoting itself; **cause line leaked from the example** | redirect-uri-mismatch, medium |
+| t03 | 05 | radius-shared-secret-mismatch; **asks for the secret**, "we will" on their controller, wording | same scenario; **asks them to check our RADIUS server** | same scenario; "We will check the shared secret configuration on our side" |
+| t04 | 04 | clarify | clarify | clarify |
+| t05 | 02 | clock-skew; wording | clock-skew | clock-skew |
+| t06 | 10, 06 | proxy-bad-gateway; lab term, wording | proxy-bad-gateway | proxy-bad-gateway |
+| t07 | 06, 10 | proxy-bad-gateway; wording | proxy-bad-gateway | proxy-bad-gateway |
+| t08 | 07 | proxy-gateway-timeout; wording | proxy-gateway-timeout | proxy-gateway-timeout |
+| t09 | 08 | proxy-rate-limit; lab term, wording | proxy-rate-limit | proxy-rate-limit |
+| t10 | 09 | proxy-forwarded-headers; lab term, wording | proxy-forwarded-headers | proxy-forwarded-headers |
+| t11 | 11 | proxy-auth-required; wording | proxy-auth-required | proxy-auth-required |
+| t12 | 13, 01 | **not_a_lab_fault (wrong)** | proxy-tls-interception | proxy-tls-interception |
+| t13 | 14 | proxy-bypass; wording | proxy-bypass | proxy-bypass |
+| t14 | 15 | redirect-loop; lab term, wording | redirect-loop | redirect-loop |
+| t15 | 16, 19 | clarify | clarify | clarify |
+| t16 | 17 | proxy-maintenance; lab term, wording | proxy-maintenance; **asks them to turn off our maintenance mode** | proxy-maintenance, **high** by the documented-text rule; "We will turn off maintenance mode on the proxy" |
+| t17 | 18, 16 | client-cert-missing (clarify was expected) | same | same |
+| t18 | 19 | cors-blocked; "we will", secrets | cors-blocked; **never says what we will check** | cors-blocked; code added "We will check the API on our side" |
+| t19 | none | clarify | service request (no model) | service request (no model) |
+| t20 | none | clarify | clarify | clarify |
+
+| | A | B | C |
+|---|---|---|---|
+| Retrieval right | 20/20 | 20/20 | 20/20 |
+| Mode appropriate | 19/20 | 19/20 | 19/20 |
+| Cause right (of those diagnosed) | 14/15 | 15/15 | 15/15 |
+| Answers breaking a rule in force today | 14/15 | 4/15 | **0/15** |
+| Needed a second request | 0 | 5 | 7 |
+| Corrected by code after two attempts | 0 | 3 | 2 |
+| High confidence | 0 | 1 (t02, by quoting itself: a bug, since fixed) | 1 (t16, documented text) |
+| Quotes from the runbooks presented as evidence | 1 (t10) | 2 (t10, t17) | 2 (t16, t17) |
+| Other unverified quotes | 1 | 3 | 0 |
+| Average time per ticket | 11.2 s | 12.7 s | 13.9 s |
+
+Earlier in this document I counted run A as 15 of 15 answers breaking a rule. Judged by the full rules as they stand today it is 14: t12 answered `not_a_lab_fault`, which the wording rule does not apply to.
+
+## Found in run C, not fixed
+
+- **The identity provider is ours only if the ticket says so.** t02's reply says "Please check the registered redirect URI in the identity provider". As the vendor of the sign-in service, the identity provider is ours, but the ticket never says "your IdP", so the ownership check cannot tell. A fix would treat the identity provider and the sign-in service as ours by default in vendor mode.
+- **t18 asks for a screenshot of the browser's Network tab.** That is not asking for a secret in words, but a Network tab screenshot can show cookies and tokens. The secrets rule does not catch it.

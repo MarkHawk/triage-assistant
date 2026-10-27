@@ -1,15 +1,15 @@
 # triage-assistant
 
-An AI support-triage assistant for [identity-lab](../identity-lab), a self-contained single sign-on lab that can be broken on purpose. It plays the IT support desk of a fictional company, Northgate Supplies, and works from the lab's runbooks.
+An AI support-triage assistant for identity-lab (a separate repository), a self-contained single sign-on lab that can be broken on purpose. It plays the IT support desk of a fictional company, Northgate Supplies, and works from the lab's runbooks.
 
-> **Status: work in progress.** Done so far: configuration, the secrets guard, the lab scenario reader, the repository checks, runbook retrieval that works from plain language, and ticket mode with Claude, Ollama and demo backends. Watch mode and the evals arrive in later sessions. The Ollama backend has been run live on two Qwen 2.5 14B models (see `docs/live-runs-ollama.md`); the Claude backend is tested against a fake client only.
+> **Status: work in progress.** Built: ticket mode with Ollama, Claude and demo backends, plain-language runbook retrieval, the secrets guard, the reply rules, and a real-ticket evaluation. **Not built yet:** watch mode (following the lab's logs) and the break-it loop evaluation. The Ollama backend has been run live on two Qwen 2.5 14B models; **the Claude backend has only been tested against a fake client**, never against the real API.
 
 Built with AI-assisted tooling (Claude Code).
 
-## What it will do
+## What it does
 
 - **Ticket mode:** takes a customer-style ticket, with or without pasted log lines, and answers with the likely cause, the log lines that prove it, the matching runbook, fix steps, a draft customer reply and a confidence level. If the evidence is thin it says so and lists the questions it would ask. It may conclude "not a lab fault" (a wrong password, an old bookmark) instead of forcing a runbook match.
-- **Watch mode:** follows the lab's container logs and, when errors start, collects the relevant lines and triages them.
+- **Watch mode (planned, not built yet):** will follow the lab's container logs and, when errors start, collect the relevant lines and triage them.
 - **Backends:** the Claude API, Ollama on another machine on your LAN, or demo mode, which replays saved answers so reviewers need neither.
 - **Output:** Markdown in the terminal. There is no web page: the lab already uses every port from 8180 to 8189.
 
@@ -22,7 +22,17 @@ cp .env.example .env     # then fill in what you use; .env is gitignored
 python -m pytest
 ```
 
-`LAB_DIR` in `.env` points at identity-lab (default `../identity-lab`). The lab is only ever read.
+`LAB_DIR` in `.env` (or the environment) points at identity-lab (default `../identity-lab`). The lab is only ever read. Tested with Python 3.14. Without the lab, the tests that need its runbooks are skipped.
+
+### Try it without a key or a GPU
+
+Demo mode replays answers recorded from real runs, and answers vague tickets with code:
+
+```bash
+BACKEND=demo python -m triage ticket demo/fixtures/redirect-loop/ticket.md --logs demo/fixtures/redirect-loop/logs.txt
+BACKEND=demo python -m triage ticket demo/fixtures/printer-offline.md
+BACKEND=demo python -m triage ticket --text "I'm locked out, can you unlock me please?"
+```
 
 ## Retrieval
 
@@ -155,7 +165,17 @@ Whether a given 14B model fits 12288 or 16384 on a 16 GB card depends on its qua
 ## Latest scores
 
 <!-- scores:start -->
-No scores recorded yet.
+Latest score for each evaluation, backend and model. Window 12288 throughout.
+
+| Evaluation | Backend and model | Date | Result |
+|---|---|---|---|
+| Real tickets: 20 written by the author, ticket text only | Ollama `qwen2.5:14b` | 2026-10-27 | retrieval right 20/20, mode right 19/20, cause right 15/15 of those diagnosed, answers breaking a reply rule 0/15 |
+| Lab scenarios: 7 cases broken in the lab, scoped logs, 3 runs each | Ollama `qwen2.5:14b` | 2026-10-26 | scenario right 21/21 |
+| Lab scenarios: the same | Ollama `qwen2.5-coder:14b` | 2026-10-26 | scenario right 12/21 |
+| Retrieval cold set: 24 queries, no model | none | 2026-10-26 | 23/24 |
+| Any of the above | Claude | | not run |
+
+**Read these with care.** The real-ticket score was reached after changing the code in response to reviewing those same tickets, so it is not a held-out score ([docs/post-review-changes.md](docs/post-review-changes.md) has all three runs). The lab-scenario runs predate those changes ([docs/live-runs-ollama.md](docs/live-runs-ollama.md)). Only the cold set was run once and never tuned on.
 <!-- scores:end -->
 
 ## Repository checks
