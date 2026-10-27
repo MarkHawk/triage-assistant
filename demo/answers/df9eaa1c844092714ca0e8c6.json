@@ -1,6 +1,6 @@
 {
   "meta": {
-    "recorded": "2026-10-26",
+    "recorded": "2026-10-27",
     "backend": "ollama",
     "model": "qwen2.5:14b"
   },
@@ -10,10 +10,10 @@
     "likely_cause": "",
     "evidence": [],
     "fix_steps": [],
-    "customer_reply": "Thank you for letting us know. To work out what is going wrong we need a little more detail. Could you tell us what exactly you see when the printer is offline, whether it happens for everyone or only for you, and what you were trying to do when it occurred? Northgate Supplies IT Support",
+    "customer_reply": "Thank you for letting us know. To work out what is going wrong we need a little more detail. Could you tell us what you see on the screen when it fails, whether it happens for everyone or only for you, and what you were trying to do when it happened? Northgate Supplies IT Support",
     "questions_for_customer": [
-      "What exactly do you see when the printer is offline? Please copy any error messages.",
-      "Does it happen for everyone, or only for some people?",
+      "What exactly do you see on the screen when the printer shows as offline?",
+      "Does it happen for everyone, or only for you?",
       "What were you trying to do when the printer showed as offline?"
     ],
     "possibilities": []

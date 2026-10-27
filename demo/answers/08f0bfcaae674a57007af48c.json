@@ -1,6 +1,6 @@
 {
   "meta": {
-    "recorded": "2026-10-26",
+    "recorded": "2026-10-27",
     "backend": "ollama",
     "model": "qwen2.5:14b"
   },
@@ -10,26 +10,28 @@
     "likely_cause": "The 'Access-Control-Allow-Origin' header has a value 'https://idlab.home:8182/' that is not equal to the supplied origin.",
     "evidence": [
       {
+        "line": "Access to fetch at 'https://idlab.home:8188/v1/whoami' from origin 'https://idlab.home:8182' has been blocked by CORS policy: The 'Access-Control-Allow-Origin' header has a value 'https://idlab.home:8182/' that is not equal to the supplied origin. Have the server send the header with a valid value.",
+        "why": "The browser's developer console reports a CORS policy issue."
+      },
+      {
         "line": "2026-10-26 22:53:45,648 INFO api event=api_cors_preflight origin=https://idlab.home:8182 method=GET headers=authorization",
-        "why": "The preflight request was successful."
+        "why": "The API logs a successful preflight request."
       },
       {
         "line": "2026-10-26 22:53:45,680 INFO api event=api_request_ok sub=1e7d717f-82d0-49ab-bb06-c34330a53287 azp=oidc-rp iat=2026-10-26T22:53:45Z exp=2026-10-26T22:58:45Z origin=https://idlab.home:8182 cors_allow_origin=https://idlab.home:8182/",
-        "why": "The API responded successfully to the GET request."
+        "why": "The API logs a successful API request."
       }
     ],
     "fix_steps": [
       "Make the API's Access-Control-Allow-Origin match the page's origin exactly.",
-      "Run the fix script: scripts/fix.sh cors-blocked",
-      "Verify the fix by checking the browser console and network tab."
+      "Verify that the same request works from curl or Postman."
     ],
-    "customer_reply": "We believe the issue is related to Cross-Origin Resource Sharing (CORS) settings. The browser is blocking the API call due to a mismatch in the 'Access-Control-Allow-Origin' header. We will adjust the CORS settings to match the page's origin exactly. Please check the browser's developer console (F12) for any further errors and let us know if the issue persists.",
+    "customer_reply": "The most likely cause is a CORS policy issue where the 'Access-Control-Allow-Origin' header does not match the origin of the page making the call. Please check the browser's developer console for the exact error message and send us a screenshot of the Console and the Network tab for the failing call. We recommend verifying if the same request works from curl or Postman.",
     "questions_for_customer": [
-      "What does the browser's developer console say, word for word?",
-      "What is the exact origin of the page making the call?",
+      "What does the browser's developer console say, word for word? Can you send a screenshot of the Console and the Network tab for the failing call?",
+      "What is the exact origin of the page making the call (the address bar up to the first '/' after the host and port)?",
       "Does the same request work from curl or Postman?",
-      "Is there an OPTIONS request before the call in the Network tab?",
-      "What changes have been made recently to the web app's domain or port?"
+      "In the Network tab, is there an OPTIONS request before the call? What status does it get, and does the call itself appear after it?"
     ],
     "possibilities": []
   }

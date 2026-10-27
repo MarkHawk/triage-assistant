@@ -41,7 +41,10 @@ def test_each_recorded_diagnosis_replays_with_verified_evidence(world, scenario,
     assert result.mode == "diagnose" and result.answer.source == "model" and result.attempts == 1
     assert result.answer.outcome == scenario and result.answer.runbook.endswith(runbook)
     assert result.answer.evidence and all(e.source == "log" for e in result.answer.evidence), result.answer.warnings
-    assert result.answer.warnings == []  # nothing had to be corrected: it is the best run
+    # recorded from a run that passed every rule at the first attempt: nothing is corrected on replay. The cors-blocked
+    # recording keeps one quote the model could not back up, which shows in the engineer section.
+    assert not any(w.startswith("Corrected by code") for w in result.answer.warnings)
+    assert len(result.answer.dropped_evidence) == (1 if scenario == "cors-blocked" else 0)
 
 
 def test_printer_clarify_answer_replays_and_asserts_nothing(world):
