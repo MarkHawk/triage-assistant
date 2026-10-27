@@ -103,15 +103,17 @@ def load_system(company: str, systems: dict[str, System], persona: str = "vendor
     return template.replace("{{company}}", company).replace("{{systems}}", "\n".join(lines)).strip()
 
 
-DIAGNOSE_REPLY_EXAMPLE = ("Thank you for the details. The most likely cause is that the sign-in service no longer trusts the "
-                          "certificate your server presents. Please check whether a certificate or security change was made on "
-                          "your side recently. Did anything change on your network shortly before this started?")
+# Deliberately from outside the lab (a shared calendar), so that if a model copies it, the copy cannot pass for a
+# diagnosis and rules.py catches it. An earlier example about certificates turned up word for word as a cause line.
+DIAGNOSE_REPLY_EXAMPLE = ("Thank you for the details. The most likely cause is that the shared calendar's permissions were reset "
+                          "during last week's mailbox move. Please check who the calendar is shared with in your mailbox settings. "
+                          "Did the calendar stop appearing straight after the move?")
 
 _DIAGNOSE = """Mode: DIAGNOSE. At least one runbook below is a strong match.
 - You may state the likely cause, in likely_cause, with the log lines that prove it in evidence.
 - Pick the outcome from the strong matches. Weak matches are only possibilities: do not base the answer on one.
 - Fill fix_steps with short plain actions based on the runbook's Fix section (never questions).
-- Unless your confidence is high, the reply says "the most likely cause is ..." and ends with one confirming question, taken from the runbook's customer questions. Without a quoted log line your confidence is not high. For a different ticket, the shape of such a reply: "{reply_example}"
+- Unless your confidence is high, the reply says "the most likely cause is ..." and ends with one confirming question, taken from the runbook's customer questions. Without a quoted log line your confidence is not high. The shape of such a reply, for an unrelated ticket about a calendar (copy its shape, never its words): "{reply_example}"
 - Never ask for a password, shared secret, key, token or cookie.
 - Do not mention lab scripts, folders, LAB_HOST, docker or Keycloak anywhere.
 - possibilities must be an empty list: they are only for clarify mode.

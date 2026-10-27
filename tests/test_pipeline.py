@@ -401,3 +401,20 @@ def test_without_the_documented_text_the_same_reply_is_capped_and_must_be_hedged
     assert result.answer.confidence == "medium"
     assert "the cause is" not in result.answer.customer_reply.lower() and "most likely" in result.answer.customer_reply.lower()
     assert result.attempts == 2  # "The cause is ..." is not allowed below high confidence
+
+
+def test_a_cause_line_copied_from_the_example_ends_up_as_the_runbooks_own_cause(world):
+    from triage.prompt import DIAGNOSE_REPLY_EXAMPLE
+    from triage import rules
+
+    leaked = {**DIAGNOSIS, "likely_cause": rules.sentences(DIAGNOSE_REPLY_EXAMPLE)[1]}
+    backend = Scripted(world["guard"], [leaked, leaked])
+    result = triage(world, "The portal goes round in circles", LOOP_LOG, backend)
+    assert "copies the worked example" in backend.prompts[1].user
+    assert result.answer.likely_cause == runbook_cause("redirect-loop") and result.answer.confidence == "medium"
+    assert any("cause statement is shown" in f for f in result.flags)
+
+
+def test_the_prompt_says_runbook_text_is_never_evidence(world):
+    assert ("Runbook text (sample logs, error pages, symptom descriptions) is reference material, never evidence; evidence must "
+            "come from the ticket or the supplied logs.") in world["system_text"]

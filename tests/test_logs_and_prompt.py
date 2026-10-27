@@ -196,4 +196,4 @@ def test_the_diagnose_prompt_carries_a_hedged_reply_example_and_it_follows_the_r
 
     ctx = Context(mode="diagnose", logs="", ticket="Since Monday our server rejects the certificate.", scenario_runbooks={},
                   retrieved={}, persona="vendor")
-    assert rules.content_violations(example, ctx) == []
+    assert [v for v in rules.content_violations(example, ctx) if not v.startswith(rules.EXAMPLE)] == []

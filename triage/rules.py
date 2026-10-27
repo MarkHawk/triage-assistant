@@ -9,6 +9,7 @@ applies if the model still breaks the rule on its second attempt, so a broken an
   WORDING   below high confidence the reply says "most likely" and asks a confirming question
   LABTERM   nothing specific to the lab (scripts, .state, LAB_HOST, docker compose, Keycloak)
   STEPS     fix steps are actions, not questions
+  EXAMPLE   nothing is copied from the prompt's worked example
 
 The checks that depend on the diagnosis itself (evidence, confidence caps, contradictions, the clarify rules)
 are in answer.py.
@@ -20,8 +21,8 @@ import re
 
 from .answer import _ASSERTS, Answer, Context
 
-SECRETS, PERSONA, WORDING, LABTERM, STEPS = "SECRETS:", "PERSONA:", "WORDING:", "LABTERM:", "STEPS:"
-REPAIRABLE = (SECRETS, PERSONA, WORDING, LABTERM, STEPS)
+SECRETS, PERSONA, WORDING, LABTERM, STEPS, EXAMPLE = "SECRETS:", "PERSONA:", "WORDING:", "LABTERM:", "STEPS:", "EXAMPLE:"
+REPAIRABLE = (SECRETS, PERSONA, WORDING, LABTERM, STEPS, EXAMPLE)
 PERSONAS = ("vendor", "internal")
 
 _SENTENCE = re.compile(r"(?<=[.?!])\s+|\n+")
@@ -301,6 +302,24 @@ def is_question(step: str) -> bool:
     return step.endswith("?") or (bool(_INTERROGATIVE.match(step)) and "?" in step)
 
 
+# --- EXAMPLE ---------------------------------------------------------------------------------------
+
+def _example_runs() -> set[tuple[str, ...]]:
+    """Six-word runs of the example that name its subject. Generic runs ("the most likely cause is that") are not
+    copying: every correctly hedged reply contains them."""
+    from .answer import _shingles
+    from .prompt import DIAGNOSE_REPLY_EXAMPLE
+
+    return {run for run in _shingles(DIAGNOSE_REPLY_EXAMPLE) if any(w.startswith(("calendar", "mailbox")) for w in run)}
+
+
+def copies_example(text: str) -> bool:
+    """True if the text contains a six-word run from the worked example's content."""
+    from .answer import _shingles
+
+    return bool(_shingles(text) & _example_runs())
+
+
 # --- the checks ------------------------------------------------------------------------------------
 
 def _customer_facing(answer: Answer) -> list[tuple[str, str]]:
@@ -335,6 +354,12 @@ def content_violations(answer: Answer, ctx: Context) -> list[str]:
         if term:
             out.append(f'{LABTERM} {where} mentions "{term.group(0)}", which is specific to the lab. Use generic wording '
                        '(for example "the identity provider", "the host name") and do not mention scripts, folders or docker commands')
+    for where, text in [("likely_cause", answer.likely_cause), ("the customer reply", answer.customer_reply),
+                        *((f"question {i}", q) for i, q in enumerate(answer.questions_for_customer, 1)),
+                        *((f"fix step {i}", s) for i, s in enumerate(answer.fix_steps, 1))]:
+        if copies_example(text):
+            out.append(f"{EXAMPLE} {where} copies the worked example about a shared calendar. Describe this ticket and its "
+                       "runbook in your own words")
     for i, step in enumerate(answer.fix_steps, 1):
         if is_question(step):
             out.append(f'{STEPS} fix step {i} is a question ("{step[:80]}"). Fix steps are actions the engineer takes; '
@@ -358,6 +383,19 @@ def repair(answer: Answer, ctx: Context) -> list[str]:
     def note(text: str) -> None:
         changes.append(text)
         answer.warnings.append("Corrected by code: " + text)
+
+    # EXAMPLE: anything copied from the worked example goes
+    if copies_example(answer.customer_reply):
+        answer.customer_reply = _map_sentences(answer.customer_reply, lambda sentence: None if copies_example(sentence) else sentence)
+        note("removed sentences copied from the prompt's worked example")
+    for name in ("questions_for_customer", "fix_steps"):
+        kept = [x for x in getattr(answer, name) if not copies_example(x)]
+        if len(kept) != len(getattr(answer, name)):
+            setattr(answer, name, kept)
+            note(f"removed {name.replace('_', ' ')} copied from the prompt's worked example")
+    if copies_example(answer.likely_cause):
+        answer.likely_cause = ""
+        note("cleared a cause line copied from the prompt's worked example")
 
     # SECRETS: take the asking sentences out
     for field_name in ("customer_reply", "questions_for_customer"):

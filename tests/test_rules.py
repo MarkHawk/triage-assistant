@@ -283,3 +283,31 @@ def test_in_the_reply_our_and_your_flip():
     """The reply speaks for us: "our RADIUS server" is ours, "your controller" is theirs."""
     assert owned(T03, "Please check our RADIUS server logs. " + HEDGED)[2]  # asking them to check ours
     assert not owned(T03, "Please check your controller's shared secret. We will check our RADIUS server. " + HEDGED)[2]
+
+
+# --- EXAMPLE: nothing copied from the worked example -------------------------------------------------
+
+def test_the_worked_example_is_from_outside_the_lab_and_the_old_one_is_gone():
+    from triage.prompt import DIAGNOSE_REPLY_EXAMPLE
+
+    assert "calendar" in DIAGNOSE_REPLY_EXAMPLE and "certificate" not in DIAGNOSE_REPLY_EXAMPLE
+
+
+def test_copying_the_example_is_caught_and_generic_hedging_is_not():
+    from triage.prompt import DIAGNOSE_REPLY_EXAMPLE
+
+    copied = rules.sentences(DIAGNOSE_REPLY_EXAMPLE)[1]
+    for field in ("likely_cause", "customer_reply"):
+        v = content_violations(answer(**{field: copied if field == "likely_cause" else HEDGED + " " + copied}), ctx())
+        assert "EXAMPLE" in kinds(v), field
+    assert "EXAMPLE" not in kinds(content_violations(answer(customer_reply="The most likely cause is that the secret differs. "
+                                                                           "Did anything change?"), ctx()))
+
+
+def test_repair_removes_what_was_copied():
+    from triage.prompt import DIAGNOSE_REPLY_EXAMPLE
+
+    copied = rules.sentences(DIAGNOSE_REPLY_EXAMPLE)[2]
+    a = answer(customer_reply=HEDGED + " " + copied, likely_cause=rules.sentences(DIAGNOSE_REPLY_EXAMPLE)[1])
+    repair(a, ctx())
+    assert copied not in a.customer_reply and a.likely_cause == "" and not rules.copies_example(a.customer_reply)
