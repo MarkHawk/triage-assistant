@@ -102,7 +102,7 @@ class Context:
     user_side_hint: bool = False
     ticket_was_flagged: bool = False
     persona: str = "vendor"  # "vendor" or "internal"; see rules.py
-    customer_side: tuple[str, ...] = ()  # parts of the customer's own estate the ticket mentions
+    causes: dict[int, str] = field(default_factory=dict)  # runbook -> its own one-sentence root cause (and title)
     documented: dict[int, tuple[str, ...]] = field(default_factory=dict)  # runbook -> its documented error lines
     confirming: str = ""  # a question that would confirm the top runbook, for repairs
 
@@ -111,8 +111,13 @@ def _clean(text: object) -> str:
     return re.sub(r"[ \t]+\n", "\n", str(text or "").replace(_EM_DASH, ", ")).strip()
 
 
+# Straight and curly quotes, single and double, all count as the same character when quotes are checked.
+_QUOTES = str.maketrans({chr(c): "'" for c in (0x22, 0x27, 0x2018, 0x2019, 0x201C, 0x201D)})
+
+
 def _squash(text: str) -> str:
-    return re.sub(r"\s+", " ", text).strip()
+    """Text as compared when checking a quote: quote marks made alike, runs of whitespace made one space."""
+    return re.sub(r"\s+", " ", text.translate(_QUOTES)).strip()
 
 
 def _strings(value: object) -> list[str]:
@@ -182,6 +187,7 @@ def check(raw: dict, ctx: Context) -> tuple[Answer, list[str]]:
             answer.possibilities = []
             answer.warnings.append("Possibilities were dropped: they belong to clarify mode only.")
         _correct_diagnosis(answer, ctx)
+        violations += cause_violations(answer, ctx)
     add_secrets_advice(answer, ctx.ticket_was_flagged)
     return answer, violations
 
@@ -198,6 +204,62 @@ def strip_placeholders(answer: Answer) -> None:
 
 
 CONTRADICTION = "CONTRADICTION:"
+CAUSE = "CAUSE:"
+_CAUSE_MAX_DF = 2  # a word counts only if at most this many runbooks' cause statements use it
+_CAUSE_MIN_SHARED = 2  # distinctive words the cause line must share with the diagnosed runbook's statement
+_CAUSE_NEAR_BEST = 0.75  # and at least this share of what it shares with its best-matching runbook
+
+
+def _cause_words(text: str) -> set[str]:
+    from .retrieval import terms  # here, not at the top: retrieval does not need answer, and answer should not need it
+
+    return {t for t in terms(text) if len(t) > 2}
+
+
+def cause_agrees(likely_cause: str, number: int | None, causes: dict[int, str]) -> bool:
+    """Whether a cause line describes the diagnosed runbook's cause rather than another runbook's.
+
+    Only distinctive words count: those that at most two runbooks' cause statements (with their titles) use, so
+    "configuration" or "new" cannot tip it. The line agrees if it shares at least two of them with the diagnosed
+    runbook's statement, and at least three quarters as many as with any other runbook's. With no statement to
+    compare against it is not checked. tests/test_answer.py checks that each runbook's own statement agrees with
+    it and with no other runbook.
+    """
+    if number is None or number not in causes:
+        return True
+    vocab = {n: _cause_words(text) for n, text in causes.items()}
+    df: dict[str, int] = {}
+    for v in vocab.values():
+        for w in v:
+            df[w] = df.get(w, 0) + 1
+    words = {w for w in _cause_words(likely_cause) if df.get(w, 0) and df[w] <= _CAUSE_MAX_DF}
+    shared = {n: len(words & v) for n, v in vocab.items()}
+    return shared[number] >= _CAUSE_MIN_SHARED and shared[number] >= _CAUSE_NEAR_BEST * max(shared.values())
+
+
+def cause_violations(answer: Answer, ctx: Context) -> list[str]:
+    """The cause line must describe the diagnosed runbook. A cause line that does not cannot carry high confidence."""
+    number = _runbook_number(answer.runbook)
+    if answer.outcome not in ctx.scenario_runbooks or number not in ctx.causes:
+        return []
+    if cause_agrees(answer.likely_cause, number, ctx.causes):
+        return []
+    if answer.confidence == "high":
+        answer.confidence = "medium"
+        answer.warnings.append("The cause line does not match the diagnosed runbook's cause; confidence capped at medium.")
+    return [f"{CAUSE} likely_cause says \"{answer.likely_cause[:100]}\", which is not the cause runbook {number:02d} describes. "
+            f"Describe that runbook's cause in your own words: {ctx.causes[number].split(chr(10))[0][:200]}"]
+
+
+def repair_cause(answer: Answer, ctx: Context) -> None:
+    """After two attempts, use the runbook's own cause statement and cap confidence at medium."""
+    number = _runbook_number(answer.runbook)
+    if number in ctx.causes and not cause_agrees(answer.likely_cause, number, ctx.causes):
+        answer.likely_cause = ctx.causes[number].split("\n")[0]
+        if answer.confidence == "high":
+            answer.confidence = "medium"
+        answer.warnings.append("Corrected by code: the cause line did not match the diagnosed runbook, so the runbook's own cause "
+                               "statement is shown instead; confidence capped at medium.")
 
 
 def contradictions(answer: Answer, ctx: Context) -> list[str]:

@@ -255,3 +255,78 @@ def test_the_customers_own_words_do_not_count_as_evidence_for_high_confidence():
 def test_a_ticket_quote_plus_the_documented_text_rule_can_still_give_high():
     answer, _ = check(raw(outcome="clock-skew", evidence=[{"line": DOC, "why": "customer quotes the error"}], confidence="high"), high())
     assert answer.confidence == "high" and answer.evidence[0].source == "ticket"
+
+
+# --- quotes and whitespace in quoted evidence --------------------------------------------------------
+
+@pytest.mark.parametrize("quoted", [
+    "They get a page saying 'We are sorry... Invalid parameter: redirect_uri'.",          # double became single
+    "They get a page saying “We are sorry... Invalid parameter: redirect_uri”.",  # curly double
+    "They get a page saying ‘We are sorry... Invalid parameter: redirect_uri’.",  # curly single
+    "They get   a page\nsaying \"We are sorry...   Invalid parameter: redirect_uri\".",     # runs of whitespace
+])
+def test_quote_marks_and_whitespace_do_not_stop_a_quote_verifying(quoted):
+    ticket = 'They get a page saying "We are sorry... Invalid parameter: redirect_uri".'
+    answer, _ = check(raw(evidence=[{"line": quoted, "why": "x"}]), ctx(ticket=ticket, logs=""))
+    assert [e.source for e in answer.evidence] == ["ticket"] and answer.dropped_evidence == []
+
+
+def test_different_words_still_fail_to_verify():
+    answer, _ = check(raw(evidence=[{"line": "They get a page saying 'Invalid parameter: client_id'.", "why": "x"}]),
+                      ctx(ticket='They get a page saying "Invalid parameter: redirect_uri".', logs=""))
+    assert answer.evidence == [] and len(answer.dropped_evidence) == 1
+
+
+# --- the cause line must describe the diagnosed runbook --------------------------------------------------
+
+from triage.answer import cause_agrees  # noqa: E402
+
+
+@pytest.fixture(scope="module")
+def causes():
+    from triage.config import load_config
+    from triage.runbooks import load_runbooks
+
+    lab = load_config(environ={}).lab_dir
+    if not (lab / "runbooks").is_dir():
+        pytest.skip("identity-lab not found at LAB_DIR")
+    return {n: b.cause_statement + "\n" + b.title for n, b in load_runbooks(lab).items()}
+
+
+def test_each_runbooks_own_cause_agrees_with_it_and_with_no_other(causes):
+    for n, text in causes.items():
+        statement = text.split("\n")[0]
+        assert cause_agrees(statement, n, causes), n
+        accepted_elsewhere = [m for m in causes if m != n and cause_agrees(statement, m, causes)]
+        assert accepted_elsewhere == [], (n, accepted_elsewhere)
+
+
+def test_the_t02_cause_line_is_caught_and_a_fair_paraphrase_is_not(causes):
+    leaked = "The sign-in service no longer trusts the certificate your server presents."
+    assert not cause_agrees(leaked, 3, causes)
+    assert cause_agrees("The HR portal's redirect URI in the OpenID Connect configuration does not match the new URL.", 3, causes)
+    assert cause_agrees("The application's address moved, but the IdP client still only allows the old redirect URI.", 3, causes)
+    assert not cause_agrees("", 3, causes) and not cause_agrees("Something is misconfigured.", 3, causes)
+
+
+def test_a_wrong_cause_line_is_a_violation_and_cannot_carry_high_confidence(causes):
+    c = ctx(causes=causes, scenario_runbooks={"redirect-uri-mismatch": "runbooks/03-redirect-uri-mismatch.md"},
+            retrieved={3: ("runbooks/03-redirect-uri-mismatch.md", "Redirect URI mismatch", True)})
+    bad = raw(outcome="redirect-uri-mismatch", likely_cause="The sign-in service no longer trusts the certificate your server presents.",
+              evidence=[], confidence="high")
+    answer, violations = check(bad, c)
+    assert any(v.startswith("CAUSE:") and "runbook 03" in v for v in violations)
+    assert answer.confidence == "medium"
+    from triage.answer import repair_cause
+
+    repair_cause(answer, c)
+    assert answer.likely_cause == causes[3].split("\n")[0] and answer.confidence == "medium"
+    assert any("runbook's own cause statement" in w for w in answer.warnings)
+
+
+def test_a_right_cause_line_passes_and_keeps_high_confidence(causes):
+    c = high(causes=causes)
+    answer, violations = check(raw(outcome="clock-skew", evidence=[], confidence="high", likely_cause=causes[2].split("\n")[0]), c)
+    assert violations == [] and answer.confidence == "high"
+    wrong, v2 = check(raw(outcome="clock-skew", evidence=[], confidence="high", likely_cause=causes[13].split("\n")[0]), c)
+    assert wrong.confidence == "medium" and any(v.startswith("CAUSE:") for v in v2)  # documented text alone is not enough
