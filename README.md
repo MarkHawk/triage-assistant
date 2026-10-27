@@ -75,7 +75,7 @@ A ticket file is the customer's message, with an optional `## Log excerpt` secti
 - **Diagnose** (at least one *strong* match): the answer may state the likely cause, with the log lines that prove it quoted word for word, the matching runbook, fix steps and a draft reply.
 - **Clarify** (only weak matches, or none): the answer **asserts no cause**. It asks 3 to 6 questions drawn from the weak runbooks' symptoms and "Questions I'd ask the customer", and mentions those runbooks only as conditions ("if the symptoms match ..., runbook 15 may apply"). The code checks this: an answer with a cause, a fix, a confidence above low or "the cause is ..." wording is sent back once with the reasons, then replaced by an answer built by code. With the demo backend, clarify answers are built by code and no model is used.
 
-Whatever a model returns is checked before you see it: quoted evidence that is not in the supplied text is dropped, the runbook is derived from the outcome rather than taken from the model, and confidence is capped when the evidence is thin.
+Whatever a model returns is checked before you see it: quoted evidence that is not in the supplied text is dropped (quote marks and spacing do not count as differences), the runbook is derived from the outcome rather than taken from the model, and confidence is capped when the evidence is thin.
 
 **Demo mode** (`BACKEND=demo`, the default) needs no key and no GPU. Clarify answers are built by code. Diagnose answers are replayed from `demo/answers/`, saved by `--record` after a real run, and keyed by the ticket, the logs and the retrieved runbooks, so changing the prompt does not orphan them. Four are saved in `demo/answers/`, with their fixtures in `demo/fixtures/`.
 
@@ -97,8 +97,9 @@ Cases where a model got the scenario wrong have no recording. [docs/live-runs-ol
 These rules are checked in code on every model answer. The model is told once when it breaks one; if it breaks it again, code corrects the answer, and says so above it.
 
 - It never asks the customer for a password, shared secret, key, token or cookie.
-- `SUPPORT_PERSONA=vendor` (the default) says "please check" or "we recommend" about the customer's own servers, proxies and networks, never "we will". `internal` may promise work.
-- Below high confidence the reply says "the most likely cause is" and asks a confirming question. High confidence needs a quoted log line, or a ticket that quotes the runbook's documented error text word for word.
+- `SUPPORT_PERSONA=vendor` (the default) treats what the ticket calls "your ..." (your API, your RADIUS server) as ours, so the reply says what we will check or fix, and what it calls "our ..." as the customer's, so "please check" or "we recommend", never "we will". `internal` may promise work.
+- The cause line must describe the runbook it diagnoses, compared with that runbook's own one-sentence root cause. If it does not, the runbook's statement is used and confidence is capped at medium.
+- Below high confidence the reply says "the most likely cause is" and asks a confirming question. High confidence needs a quoted log line, or a ticket that quotes the runbook's documented error text word for word, and a cause line that matches the runbook.
 - Nothing specific to the lab appears in fix steps or replies, and fix steps are actions, not questions.
 - "Not a lab fault" is not accepted when a runbook matched strongly and nothing points to the user's side.
 - Account lockouts and admin requests get a short reply pointing to the account administrator, with no questions and no model.

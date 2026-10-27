@@ -68,3 +68,44 @@ Automated columns only. The send-ready verdicts are not in this table: the first
 - **The persona rule is broad.** When the ticket mentions anything of the customer's, any "we will fix/change/check/..." in the reply is rewritten, including a harmless one about our own service. "We will update you" and "We will look into it" are left alone.
 - **Service requests are recognised by wording**, so an unusual phrasing will go to the model instead, and a wording like "reset" next to a real fault that only matched weakly would be answered as a request.
 - **Recordings were redone** for the demo, because the old ones predate these rules (see the README).
+
+# Second round of post-review changes (2026-10-27)
+
+Three more changes from the review of the final run above. Like the first round they were made after reading the answers, so they are not independent of these 20 tickets.
+
+| # | Change | How it is enforced |
+|---|---|---|
+| 9 | **Cause consistency.** The cause line must describe the runbook it diagnoses. t02's cause line was the worked example's sentence about certificates, under a redirect URI diagnosis | Compared with the runbook's own "Root cause, in one sentence" (and title). A mismatch is sent back once; if it persists, the runbook's own statement replaces it and confidence is capped at medium. High confidence now also needs the cause line to pass |
+| 10 | **Ownership both ways (vendor persona).** What the ticket calls "your ..." (your API, your RADIUS server, your maintenance page) is ours, so the reply says what we will check or fix. What it calls "our ..." is the customer's, so "please check" or "we recommend". t03, t16 and t18 | Checked on the object of each "please check" or "we recommend": the first thing named after the verb, and anything joined to it by "and" or "or". A plain "the RADIUS server" in the reply takes the owner the ticket gave it; in the reply itself "our" and "your" flip. If the ticket points only at our side, asking the customer to fix anything is caught (t16). If the reply names something of ours but never says what we will do, that is caught too (t18) |
+| 11 | **Quote marks and whitespace.** Straight and curly, single and double quotes, and runs of whitespace, count as equal when a quoted line is verified. t02 and t18 lost a correct quote because the model turned `"` into `'` | Code |
+
+## How the cause check decides
+
+Only distinctive words count: words that at most two runbooks' cause statements (with their titles) use, so generic words like "configuration" or "new" cannot tip it. A cause line agrees with the diagnosed runbook if it shares at least two of those words with that runbook's statement, and at least three quarters as many as with its best-matching runbook.
+
+I chose those numbers by trying combinations against two kinds of evidence:
+
+- **Independent of your tickets:** every runbook's own statement agrees with its runbook (19 of 19), and none of the 342 pairings of one runbook's statement with a different runbook is accepted. That is a test in `tests/test_answer.py`.
+- **From your tickets' runs:** the 44 diagnosed cause lines from the three runs so far. The setting passes all 43 that describe the right runbook and fails the one that does not (t02, final run). An earlier, looser version wrongly failed run 1's correct t02 line, which is how the distinctive-word rule came about. So these thresholds were set with the real-ticket outputs in view.
+
+## What the checks find in the final run's saved answers
+
+Applied to the stored answers of the final run, without calling the model again:
+
+| Ticket | Cause line | Ownership | Dropped quotes now verified |
+|---|---|---|---|
+| t02 | **does not match** runbook 03 | | 1 of 1 |
+| t03 | ok | **asks the customer to check our RADIUS server**; never says what we will do | |
+| t06 | ok | | 1 of 1 |
+| t10 | ok | | 0 of 1 (a real mismatch) |
+| t16 | ok | **asks the customer to turn off our maintenance mode** | |
+| t17 | ok | | 0 of 1 (a real mismatch) |
+| t18 | ok | **names our API but never says what we will check** | 1 of 1 |
+
+No other diagnosed answer is flagged by the new checks.
+
+## Limits
+
+- **Ownership is read from wording.** It looks for things named after "your", "our", "my" or "the" from a fixed list of nouns (server, API, proxy, page, controller and so on). A generic word such as "page" or "side" in the reply only matches the ticket's full phrase, because "the page" could be anyone's. Something the ticket never names, such as the proxy in t16, is judged from the ticket as a whole: if it names only our things, asking the customer to fix anything is caught.
+- **The code repairs are mechanical.** For example, "Please check the shared secret on both the new controller and the RADIUS server" becomes "We will check the RADIUS server on our side, and we recommend that you check the new controller on yours." It is correct, but it reads like a template. The flag above the answer says when code did it.
+- **The real-ticket set has not been rerun** after this round.
