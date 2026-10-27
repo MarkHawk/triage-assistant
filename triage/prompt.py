@@ -86,6 +86,11 @@ def neutralise(text: str) -> str:
     return _TAGS.sub("[tag removed]", text)
 
 
+OPENING = {
+    "vendor": "You are the triage assistant for the support desk of the sign-in service used by {{company}}, a fictional company.",
+    "internal": "You are the triage assistant for the IT support desk at {{company}}, a fictional company.",
+}
+
 PERSONA_TEXT = {
     "vendor": ("You work for the vendor of the sign-in service. The customer runs their own servers, proxies, networks and "
                "applications. For anything the ticket calls theirs (our server, our side, our proxy, our network) never say that "
@@ -98,7 +103,7 @@ PERSONA_TEXT = {
 
 def load_system(company: str, systems: dict[str, System], persona: str = "vendor", path: Path | None = None) -> str:
     template = (path or REPO_ROOT / "prompts" / "system.md").read_text(encoding="utf-8")
-    template = template.replace("{{persona}}", PERSONA_TEXT[persona])
+    template = template.replace("{{opening}}", OPENING[persona]).replace("{{persona}}", PERSONA_TEXT[persona])
     lines = [f"- {s.display}: {s.protocol or 'supporting service'} ({', '.join(s.staff_say[:3])})" for s in systems.values()]
     return template.replace("{{company}}", company).replace("{{systems}}", "\n".join(lines)).strip()
 
@@ -123,7 +128,7 @@ CLARIFY_EXAMPLE = {
     "outcome": "needs_more_info", "confidence": "low", "likely_cause": "", "evidence": [], "fix_steps": [],
     "customer_reply": ("Thank you for letting us know. To work out what is going wrong we need a little more detail. "
                        "Could you tell us what you see on the screen when it fails, whether it happens for everyone or only "
-                       "for you, and how long it takes before the error appears? Northgate Supplies IT Support"),
+                       "for you, and how long it takes before the error appears?"),
     "questions_for_customer": ["What exactly do you see when it fails? Please copy any error message.",
                                "Does it happen for everyone, or only for some people?",
                                "How long after you press Log in does the error appear?"],
@@ -139,6 +144,17 @@ _CLARIFY = """Mode: CLARIFY. No runbook below is a strong match, so nothing is e
 
 An example of a compliant reply, for a different, vague ticket. Follow its shape, not its content:
 {example}"""
+
+
+def _without_forbidden_asks(text: str) -> str:
+    """Drop runbook sentences that ask the customer for something the reply rules forbid (a Network tab screenshot,
+    a HAR file, a secret), so the model is not shown wording it may not use. The runbooks themselves are untouched."""
+    from .rules import _map_sentences, secret_requests
+
+    if not secret_requests(text):
+        return text
+    return "\n".join(_map_sentences(line, lambda s: None if secret_requests(s) else s) if secret_requests(line) else line
+                     for line in text.split("\n"))
 
 
 def build_prompt(system_text: str, mode: str, ticket_text: str, logs_text: str, matches: list[Match],
@@ -172,7 +188,7 @@ def build_prompt(system_text: str, mode: str, ticket_text: str, logs_text: str, 
     blocks: list[str] = []
     for m in shown:
         label = "strong" if m.strong else "weak"
-        body = m.runbook.excerpt(each)
+        body = _without_forbidden_asks(m.runbook.excerpt(each))
         if len(body) < len(m.runbook.excerpt(10**6)):
             notes.append(f"Runbook {m.runbook.number:02d} was shortened to {len(body)} characters to fit.")
         blocks.append(f'<runbook number="{m.runbook.number}" match="{label}" file="{m.runbook.path}">\n{body}\n</runbook>')

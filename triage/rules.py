@@ -45,9 +45,17 @@ _ASKS = re.compile(
 _NEGATED = re.compile(r"\b(?:do not|don't|dont|never|please avoid|avoid|no need to|must not|should not|shouldn't|without)\b", re.IGNORECASE)
 
 
+_TRAFFIC = re.compile(r"\b(?:network tab|network panel|har file|\.har\b|har export|request headers?|response headers?|"
+                      r"http headers?|copy as curl|copy as fetch)\b", re.IGNORECASE)
+_HAND_OVER = re.compile(rf"\b(?:{_VERB}|screenshots?|screen shots?|export|save|capture|record)\b", re.IGNORECASE)
+NETWORK_INSTEAD = "Could you send us the exact error text from the browser console and the HTTP status code of the failing request?"
+
+
 def secret_requests(text: str) -> list[str]:
-    """Sentences that ask the reader to hand over a secret. "Please do not send passwords" is not one."""
-    return [s for s in sentences(text) if _ASKS.search(s) and not _NEGATED.search(s)]
+    """Sentences that ask the reader to hand over a secret, or something that carries one: a screenshot of the Network
+    tab, a HAR file or request headers, which can hold cookies and tokens. "Please do not send passwords" is not one."""
+    return [s for s in sentences(text)
+            if not _NEGATED.search(s) and (_ASKS.search(s) or (_TRAFFIC.search(s) and _HAND_OVER.search(s)))]
 
 
 # --- PERSONA and OWNERSHIP (vendor persona only) --------------------------------------------------
@@ -62,7 +70,7 @@ _THING_NOUNS = {
     "server", "servers", "api", "apis", "idp", "page", "app", "apps", "application", "applications", "proxy", "controller",
     "network", "firewall", "certificate", "certificates", "portal", "endpoint", "service", "system", "systems", "laptop", "pc",
     "device", "devices", "integration", "gateway", "site", "website", "email", "side", "end", "router", "switch", "vpn", "dns",
-    "environment", "infrastructure", "machine", "cluster", "browser", "console", "balancer"}
+    "environment", "infrastructure", "machine", "cluster", "browser", "console", "balancer", "provider"}
 _DEFAULT_THEIRS = {"browser", "console", "laptop", "pc", "device", "devices"}  # the customer's unless the ticket says otherwise
 _TOKEN = re.compile(r"[A-Za-z][\w'-]*|[^\w\s]")
 
@@ -103,7 +111,13 @@ def ownership(ticket: str) -> dict[tuple[str, ...], str]:
     return {key: (owners.pop() if len(owners) == 1 else "") for key, owners in seen.items()}
 
 
-def _owner_in_reply(det: str, words: tuple[str, ...], owners: dict) -> str | None:
+def owned_names(names) -> tuple[tuple[str, ...], ...]:
+    """VENDOR_OWNS entries ("sign-in service", "API") as the words that name them."""
+    return tuple(tuple(_word(t) for t in _TOKEN.findall(n) if t[:1].isalpha()) for n in names if n.strip())
+
+
+def _owner_in_reply(det: str, words: tuple[str, ...], owners: dict, owned=()) -> str | None:
+    """The ticket's word wins ("our API" is theirs); then VENDOR_OWNS; then a few things that are always theirs."""
     if det == "our":
         return OURS
     if det in ("your", "their"):
@@ -113,6 +127,8 @@ def _owner_in_reply(det: str, words: tuple[str, ...], owners: dict) -> str | Non
         owner = owners.get(words[-1:])
     if owner:
         return owner
+    if owner is None and any(c and words[-len(c):] == c for c in owned):
+        return OURS
     return THEIRS if words[-1] in _DEFAULT_THEIRS else None
 
 
@@ -131,7 +147,7 @@ _PROMISE = re.compile(
     r"check|repair|modify|amend|enable|disable|re-?issue|install|upgrade|patch|reset)\b(?!\s+you\b))", re.IGNORECASE)
 
 
-def _objects(sentence: str, owners: dict) -> list[tuple[str | None, str]]:
+def _objects(sentence: str, owners: dict, owned=()) -> list[tuple[str | None, str]]:
     """(owner, name) for what each "please check" or "we recommend" in the sentence is about: the first thing after
     the verb, and anything joined to it by "and" or "or" ("both the new controller and the RADIUS server")."""
     out = []
@@ -145,13 +161,13 @@ def _objects(sentence: str, owners: dict) -> list[tuple[str | None, str]]:
             if chain and not set(between) <= {"and", "or", "both", "either", ","}:
                 break
             det, words, name = starts[i]
-            out.append((_owner_in_reply(det, words, owners), name))
+            out.append((_owner_in_reply(det, words, owners, owned), name))
             chain, after = True, i + len(words) + 1
     return out
 
 
-def _mentions(sentence: str, owners: dict) -> set[str]:
-    return {o for _, det, words, _ in _things(sentence)[1] if (o := _owner_in_reply(det, words, owners))}
+def _mentions(sentence: str, owners: dict, owned=()) -> set[str]:
+    return {o for _, det, words, _ in _things(sentence)[1] if (o := _owner_in_reply(det, words, owners, owned))}
 
 
 def customer_side(ticket: str) -> tuple[str, ...]:
@@ -167,7 +183,7 @@ def ownership_violations(answer: Answer, ctx: Context) -> list[str]:
     theirs = {w for w, o in owners.items() if o == THEIRS}
     out = []
     for sentence in sentences(answer.customer_reply):
-        objects = _objects(sentence, owners)
+        objects = _objects(sentence, owners, ctx.owned)
         mine = [name for owner, name in objects if owner == OURS]
         if mine:
             out.append(f'{PERSONA} the reply says "{sentence[:90]}", asking the customer to act on "{mine[0]}", which the ticket '
@@ -175,11 +191,11 @@ def ownership_violations(answer: Answer, ctx: Context) -> list[str]:
         elif _DEFER_FIX.search(sentence) and not objects_owned(objects) and ours and not theirs:
             out.append(f'{PERSONA} the reply says "{sentence[:90]}", asking the customer to fix something, but the ticket points '
                        'only at our side. Say what we will do')
-        mentioned = _mentions(sentence, owners)
+        mentioned = _mentions(sentence, owners, ctx.owned)
         if _PROMISE.search(sentence) and OURS not in mentioned and (THEIRS in mentioned or (theirs and not ours)):
             out.append(f'{PERSONA} the reply says "{sentence[:90]}", promising work on something the ticket calls the customer\'s '
                        '("our ..."). Write "please check" or "we recommend" instead')
-    reply_ours = any(OURS in _mentions(s, owners) for s in sentences(answer.customer_reply))
+    reply_ours = any(OURS in _mentions(s, owners, ctx.owned) for s in sentences(answer.customer_reply))
     if ours and reply_ours and not _WE_WILL.search(answer.customer_reply):
         out.append(f"{PERSONA} the reply names something the ticket calls ours but never says what we will check or fix. "
                    'Add, for example, "we will check the ... on our side"')
@@ -225,7 +241,7 @@ def ownership_repair(answer: Answer, ctx: Context, note) -> None:
 
     def fix(sentence: str) -> str:
         nonlocal changed
-        objects = _objects(sentence, owners)
+        objects = _objects(sentence, owners, ctx.owned)
         mine = [name for owner, name in objects if owner == OURS]
         yours = [name for owner, name in objects if owner == THEIRS]
         if mine and yours:
@@ -234,7 +250,7 @@ def ownership_repair(answer: Answer, ctx: Context, note) -> None:
         if mine or (_DEFER_FIX.search(sentence) and not objects_owned(objects) and ours and not theirs):
             changed = True
             return _to_we_will(sentence)
-        mentioned = _mentions(sentence, owners)
+        mentioned = _mentions(sentence, owners, ctx.owned)
         if _PROMISE.search(sentence) and OURS not in mentioned and (THEIRS in mentioned or (theirs and not ours)):
             changed = True
             return _PROMISE.sub(lambda m: "We recommend that you " if m.group(0)[:1].isupper() else "we recommend that you ", sentence)
@@ -244,7 +260,7 @@ def ownership_repair(answer: Answer, ctx: Context, note) -> None:
     if changed:
         note("changed who does what in the reply: we check or fix our own things, and recommend on the customer's")
     reply_ours = [name for s in sentences(answer.customer_reply) for _, det, words, name in _things(s)[1]
-                  if _owner_in_reply(det, words, owners) == OURS]
+                  if _owner_in_reply(det, words, owners, ctx.owned) == OURS]
     if ours and reply_ours and not _WE_WILL.search(answer.customer_reply):
         answer.customer_reply = (answer.customer_reply.rstrip() + f" We will check the {reply_ours[0]} on our side and let you know what we find.")
         note("added what we will check on our side")
@@ -334,8 +350,9 @@ def content_violations(answer: Answer, ctx: Context) -> list[str]:
     out: list[str] = []
     for where, text in _customer_facing(answer):
         for bad in secret_requests(text):
-            out.append(f'{SECRETS} {where} says "{bad[:90]}", which asks for a secret. Never ask for a password, shared secret, '
-                       "key, token or cookie: ask them to check or compare it, or to confirm they have changed it")
+            out.append(f'{SECRETS} {where} says "{bad[:90]}", which asks for a secret or something that carries one. Never ask for '
+                       "a password, shared secret, key, token or cookie, or for a screenshot of the Network tab, a HAR file or request "
+                       "headers: ask them to check or compare a secret, and for the console error text and status codes instead")
     out += ownership_violations(answer, ctx)
     if _needs_hedging(answer, ctx):
         problems = []
@@ -403,11 +420,16 @@ def repair(answer: Answer, ctx: Context) -> list[str]:
         if field_name == "customer_reply":
             bad = secret_requests(value)
             if bad:
+                traffic = any(_TRAFFIC.search(b) for b in bad)
                 answer.customer_reply = _map_sentences(value, lambda sentence: None if sentence in bad else sentence)
-                note(f"removed {len(bad)} sentence(s) from the reply that asked for a secret")
+                if traffic and NETWORK_INSTEAD not in answer.customer_reply:
+                    answer.customer_reply = answer.customer_reply.rstrip() + " " + NETWORK_INSTEAD
+                note(f"removed {len(bad)} sentence(s) from the reply that asked for a secret"
+                     + (", and asked for the console error and status code instead" if traffic else ""))
         else:
-            kept = [q for q in value if not secret_requests(q)]
-            if len(kept) != len(value):
+            kept = [q if not secret_requests(q) else (NETWORK_INSTEAD if _TRAFFIC.search(q) else None) for q in value]
+            kept = list(dict.fromkeys(q for q in kept if q))
+            if kept != value:
                 answer.questions_for_customer = kept
                 note(f"removed {len(value) - len(kept)} question(s) that asked for a secret")
 
@@ -451,3 +473,26 @@ def repair(answer: Answer, ctx: Context) -> list[str]:
             answer.customer_reply = text
             note("reworded the reply as a most likely cause and added a confirming question")
     return changes
+
+
+# --- the sign-off ----------------------------------------------------------------------------------
+
+_SIGNOFF_LINES = re.compile(r"(?:\n|^)\s*(?:(?:best|kind|warm)\s+regards|regards|many thanks|thanks|thank you|cheers|sincerely),?\s*$",
+                            re.IGNORECASE)
+
+
+def apply_signoff(answer: Answer, signoff: str, company: str = "") -> None:
+    """End every customer reply the same way, whichever mode or source made it: any sign-off the model wrote is
+    removed and the persona's own is added."""
+    if not signoff or not answer.customer_reply:
+        return
+    reply = answer.customer_reply.rstrip()
+    names = [n for n in {signoff, f"{company} IT Support" if company else "", "IT Support"} if n]
+    for name in sorted(names, key=len, reverse=True):
+        if reply.endswith(name):
+            reply = reply[: -len(name)].rstrip(" ,\n")
+            break
+    reply = _SIGNOFF_LINES.sub("", reply).rstrip()
+    if company:
+        reply = re.sub(rf"\s*{re.escape(company)} IT Support\.?$", "", reply).rstrip()
+    answer.customer_reply = f"{reply}\n\n{signoff}"

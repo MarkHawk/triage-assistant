@@ -63,6 +63,13 @@ class Config:
     ollama_keep_alive: str
     log_secrets: str  # "mask" (default) or "refuse"
     support_persona: str  # "vendor" (default) or "internal"
+    vendor_owns: tuple[str, ...]  # in vendor mode, what is ours even when the ticket does not say "your"
+    support_signoff: str  # how every customer reply ends; "" means the persona's default
+
+    def signoff(self, company: str) -> str:
+        if self.support_signoff:
+            return self.support_signoff
+        return "Sign-in service support" if self.support_persona == "vendor" else f"{company} IT Support"
 
     @property
     def ollama_prompt_budget_tokens(self) -> int:
@@ -117,4 +124,6 @@ def load_config(env_file: Path | None = None, environ: dict[str, str] | None = N
         ollama_keep_alive=env.get("OLLAMA_KEEP_ALIVE", "").strip() or "30m",
         log_secrets=log_secrets,
         support_persona=persona,
+        vendor_owns=tuple(x.strip() for x in (env.get("VENDOR_OWNS", "").strip() or "sign-in service, identity provider, API").split(",") if x.strip()),
+        support_signoff=env.get("SUPPORT_SIGNOFF", "").strip(),
     )

@@ -42,9 +42,22 @@ def decide_mode(result: Result) -> str:
     return "diagnose" if any(m.strong for m in result.matches) else "clarify"
 
 
+DEFAULT_OWNED = ("sign-in service", "identity provider", "API")
+
+
 def run_triage(ticket_text: str, logs_text: str, *, backend: Backend, retriever: Retriever,
                scenarios: dict[str, Scenario], guard: Guard, system_text: str, log_secrets: str = "mask",
-               persona: str = "vendor") -> Triage:
+               persona: str = "vendor", owned: tuple[str, ...] = DEFAULT_OWNED, signoff: str = "", company: str = "") -> Triage:
+    """Triage one ticket. Every reply ends with the same sign-off: `signoff`, or the persona's default."""
+    result = _triage(ticket_text, logs_text, backend=backend, retriever=retriever, scenarios=scenarios, guard=guard,
+                     system_text=system_text, log_secrets=log_secrets, persona=persona, owned=owned)
+    rules.apply_signoff(result.answer, signoff or ("Sign-in service support" if persona == "vendor" else "IT Support"), company)
+    return result
+
+
+def _triage(ticket_text: str, logs_text: str, *, backend: Backend, retriever: Retriever,
+            scenarios: dict[str, Scenario], guard: Guard, system_text: str, log_secrets: str,
+            persona: str, owned: tuple[str, ...]) -> Triage:
     """Secrets in the ticket, and by default in the logs, are masked and flagged. With log_secrets="refuse" a secret
     in the logs raises SecretFound. A lab .env value anywhere raises SecretFound. BackendError if the model
     could not be used."""
@@ -74,7 +87,7 @@ def run_triage(ticket_text: str, logs_text: str, *, backend: Backend, retriever:
     ctx = ans.Context(mode=mode, logs=logs_text + "\n" + tidy_logs(logs_text), ticket=masked.text, scenario_runbooks=scenario_runbooks,
                       retrieved=retrieved, user_side_hint=bool(result.hints), ticket_was_flagged=masked.flagged,
                       persona=persona, causes={n: b.cause_statement + "\n" + b.title for n, b in retriever.runbooks.items()},
-                      reference=retriever.reference,
+                      reference=retriever.reference, owned=rules.owned_names(owned) if persona == "vendor" else (),
                       documented=retriever.documented, confirming=confirming)
 
     prompt = build_prompt(system_text, mode, masked.text, logs_text, list(result.matches), result.hints,

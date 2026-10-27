@@ -104,6 +104,7 @@ class Context:
     ticket_was_flagged: bool = False
     persona: str = "vendor"  # "vendor" or "internal"; see rules.py
     causes: dict[int, str] = field(default_factory=dict)  # runbook -> its own one-sentence root cause (and title)
+    owned: tuple[tuple[str, ...], ...] = ()  # vendor mode: what is ours even when the ticket does not say "your"
     reference: "Reference | None" = None  # the runbooks' text, to tell a quote from a runbook apart from an invented one
     documented: dict[int, tuple[str, ...]] = field(default_factory=dict)  # runbook -> its documented error lines
     confirming: str = ""  # a question that would confirm the top runbook, for repairs

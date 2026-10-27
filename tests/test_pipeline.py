@@ -418,3 +418,23 @@ def test_a_cause_line_copied_from_the_example_ends_up_as_the_runbooks_own_cause(
 def test_the_prompt_says_runbook_text_is_never_evidence(world):
     assert ("Runbook text (sample logs, error pages, symptom descriptions) is reference material, never evidence; evidence must "
             "come from the ticket or the supplied logs.") in world["system_text"]
+
+
+# --- the same persona and sign-off in every mode ---------------------------------------------------------
+
+def test_every_kind_of_reply_ends_with_the_vendor_sign_off(world):
+    diagnosed = triage(world, "The portal goes round in circles", LOOP_LOG, Scripted(world["guard"], [DIAGNOSIS]))
+    clarified = triage(world, PRINTER, backend=Scripted(world["guard"], [{**CLARIFY_GOOD, "customer_reply":
+                       "Which address do you use, please?\n\nNorthgate Supplies IT Support"}]))
+    built = triage(world, PRINTER)  # demo: built by code
+    request = triage(world, "I'm locked out, please unlock me.")
+    for result in (diagnosed, clarified, built, request):
+        assert result.answer.customer_reply.endswith("\n\nSign-in service support"), result.mode
+        assert "Northgate Supplies IT Support" not in result.answer.customer_reply
+
+
+def test_an_internal_persona_signs_off_as_the_companys_it_support(world):
+    result = run_triage(PRINTER, "", backend=DemoBackend(world["guard"], CLAUDE_BUDGET), retriever=world["retriever"],
+                        scenarios=world["scenarios"], guard=world["guard"], system_text=world["system_text"], persona="internal",
+                        signoff="Northgate Supplies IT Support", company="Northgate Supplies")
+    assert result.answer.customer_reply.endswith("\n\nNorthgate Supplies IT Support")

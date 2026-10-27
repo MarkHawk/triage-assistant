@@ -198,3 +198,23 @@ def test_the_diagnose_prompt_carries_a_hedged_reply_example_and_it_follows_the_r
     ctx = Context(mode="diagnose", logs="", ticket="Since Monday our server rejects the certificate.", scenario_runbooks={},
                   retrieved={}, persona="vendor")
     assert [v for v in rules.content_violations(example, ctx) if not v.startswith(rules.EXAMPLE)] == []
+
+
+def test_the_prompt_rules_for_confirming_questions_network_captures_and_sign_offs(lab):
+    from triage.prompt import CLARIFY_EXAMPLE
+
+    company, systems = load_names(lab)
+    vendor, internal = load_system(company, systems, "vendor"), load_system(company, systems, "internal")
+    assert "must ask about something the ticket does not already state" in vendor and "Has the URL changed?" in vendor
+    assert "Network tab, a HAR file or request headers" in vendor and "no sign-off at the end" in vendor
+    assert "IT support desk at Northgate Supplies" not in vendor and "sign-in service used by Northgate Supplies" in vendor
+    assert "IT support desk at Northgate Supplies" in internal
+    assert "IT Support" not in CLARIFY_EXAMPLE["customer_reply"]
+
+
+def test_runbook_sentences_asking_for_network_captures_are_not_shown_to_the_model(lab, system_text):
+    runbooks = load_runbooks(lab)
+    assert "screenshot of the Console and the Network tab" in runbooks[19].sections["Questions I'd ask the customer"]
+    p = build_prompt(system_text, "diagnose", "t", "", matches_of(runbooks, [19]), (), "", CLAUDE_BUDGET)
+    assert "screenshot of the Console and the Network tab" not in p.user
+    assert "What does the browser's developer console say, word for word?" in p.user  # the rest of that question stays

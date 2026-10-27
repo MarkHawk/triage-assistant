@@ -67,3 +67,12 @@ def test_support_persona_defaults_to_vendor_and_can_be_internal(tmp_path):
     assert cfg(tmp_path, "SUPPORT_PERSONA=Internal\n").support_persona == "internal"
     with pytest.raises(ConfigError):
         cfg(tmp_path, "SUPPORT_PERSONA=partner\n")
+
+
+def test_vendor_owns_and_the_sign_off_have_defaults_and_can_be_set(tmp_path):
+    c = cfg(tmp_path)
+    assert c.vendor_owns == ("sign-in service", "identity provider", "API")
+    assert c.signoff("Northgate Supplies") == "Sign-in service support"
+    assert cfg(tmp_path, "SUPPORT_PERSONA=internal\n").signoff("Northgate Supplies") == "Northgate Supplies IT Support"
+    c = cfg(tmp_path, "VENDOR_OWNS=API, partner gateway\nSUPPORT_SIGNOFF=The Acme support team\n")
+    assert c.vendor_owns == ("API", "partner gateway") and c.signoff("Northgate Supplies") == "The Acme support team"

@@ -160,13 +160,15 @@ def score(ticket: RealTicket, result: Triage, scenarios: dict[str, Scenario]) ->
 
 
 def run_all(tickets: list[RealTicket], *, backend: Backend, retriever: Retriever, scenarios: dict[str, Scenario],
-            guard: Guard, system_text: str, log_secrets: str = "mask", persona: str = "vendor", progress=None) -> list[Row]:
+            guard: Guard, system_text: str, log_secrets: str = "mask", persona: str = "vendor", owned=None, signoff: str = "",
+            company: str = "", progress=None) -> list[Row]:
     rows: list[Row] = []
     for ticket in tickets:
         started = time.monotonic()
         try:
             result = run_triage(ticket.text, "", backend=backend, retriever=retriever, scenarios=scenarios,
-                                guard=guard, system_text=system_text, log_secrets=log_secrets, persona=persona)
+                                guard=guard, system_text=system_text, log_secrets=log_secrets, persona=persona,
+                                **({"owned": owned} if owned is not None else {}), signoff=signoff, company=company)
             row = score(ticket, result, scenarios)
         except (BackendError, SecretFound) as exc:
             row = Row(ticket=ticket, error=str(exc))
@@ -318,7 +320,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Running {len(tickets)} tickets on {args.backend} {args.model}" + (f" at {args.num_ctx}" if args.backend == "ollama" else ""), file=sys.stderr)
         rows = run_all(tickets, backend=backend, retriever=build_retriever(config.lab_dir), scenarios=scenarios, guard=guard,
                        system_text=load_system(company, systems, config.support_persona), log_secrets=config.log_secrets,
-                       persona=config.support_persona,
+                       persona=config.support_persona, owned=config.vendor_owns, signoff=config.signoff(company), company=company,
                        progress=lambda r: print(f"  {r.ticket.id}: {r.error or r.mode + ' / ' + r.outcome} ({r.seconds} s)", file=sys.stderr))
     except (TicketFileError, ConfigError, FileNotFoundError) as exc:
         print(f"error: {exc}", file=sys.stderr)

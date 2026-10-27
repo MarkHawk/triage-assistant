@@ -311,3 +311,74 @@ def test_repair_removes_what_was_copied():
     a = answer(customer_reply=HEDGED + " " + copied, likely_cause=rules.sentences(DIAGNOSE_REPLY_EXAMPLE)[1])
     repair(a, ctx())
     assert copied not in a.customer_reply and a.likely_cause == "" and not rules.copies_example(a.customer_reply)
+
+
+# --- SECRETS: nothing that carries cookies or tokens ------------------------------------------------
+
+@pytest.mark.parametrize("sentence", [
+    "Please send us a screenshot of the Console and the Network tab for the failing call.",
+    "Could you export a HAR file and attach it?",
+    "Can you send the request headers?",
+    "Please copy as cURL and paste it here.",
+    "Share a screenshot of the network panel, please.",
+])
+def test_asking_for_network_tab_captures_or_headers_is_caught(sentence):
+    assert rules.secret_requests(sentence) == [sentence]
+
+
+@pytest.mark.parametrize("sentence", [
+    "Please check the Network tab for the status code.",
+    "Please do not send screenshots of the Network tab, as they can contain cookies.",
+    "What does the browser console say, word for word?",
+])
+def test_reading_the_network_tab_or_the_console_is_fine(sentence):
+    assert rules.secret_requests(sentence) == []
+
+
+def test_repair_asks_for_the_console_error_and_status_code_instead():
+    a = answer(customer_reply=HEDGED + " Please send us a screenshot of the Network tab.",
+               questions_for_customer=["Can you send the request headers?", "Which page fails?"])
+    assert "SECRETS" in kinds(content_violations(a, ctx()))
+    repair(a, ctx())
+    assert "Network tab" not in a.customer_reply and rules.NETWORK_INSTEAD in a.customer_reply
+    assert a.questions_for_customer == [rules.NETWORK_INSTEAD, "Which page fails?"]
+    assert "SECRETS" not in kinds(content_violations(a, ctx()))
+
+
+# --- VENDOR_OWNS: ours even when the ticket does not say "your" ---------------------------------------
+
+T02 = "We migrated the HR portal to new servers at the weekend and its address has changed. Users get an error on Sign in."
+OWNED = rules.owned_names(("sign-in service", "identity provider", "API"))
+
+
+def test_owned_names_become_words():
+    assert OWNED == (("sign-in", "service"), ("identity", "provider"), ("api",))
+
+
+def test_the_t02_reply_asking_the_customer_to_check_our_identity_provider_is_caught_and_fixed():
+    a = answer(customer_reply="The most likely cause is the redirect URI. Please check the registered redirect URI in the identity "
+                              "provider. Which exact address do users land on?")
+    c = ctx(ticket=T02, owned=OWNED)
+    v = [x for x in content_violations(a, c) if x.startswith("PERSONA")]
+    assert v and "identity provider" in v[0]
+    repair(a, c)
+    assert "We will check the registered redirect URI in the identity provider." in a.customer_reply
+    assert not [x for x in content_violations(a, c) if x.startswith("PERSONA")]
+
+
+def test_without_the_setting_or_when_the_ticket_calls_it_theirs_it_is_not_ours():
+    reply = "Please check the registered redirect URI in the identity provider. " + HEDGED
+    assert not [x for x in content_violations(answer(customer_reply=reply), ctx(ticket=T02)) if x.startswith("PERSONA")]
+    theirs = "We run our own identity provider, and since the move users get an error."
+    assert not [x for x in content_violations(answer(customer_reply=reply), ctx(ticket=theirs, owned=OWNED)) if x.startswith("PERSONA")]
+
+
+# --- the sign-off ----------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("reply", ["We are on it.\n\nNorthgate Supplies IT Support", "We are on it. Northgate Supplies IT Support",
+                                   "We are on it.\n\nBest regards,\nNorthgate Supplies IT Support", "We are on it.\n\nKind regards,",
+                                   "We are on it."])
+def test_every_reply_ends_with_the_one_sign_off(reply):
+    a = answer(customer_reply=reply)
+    rules.apply_signoff(a, "Sign-in service support", "Northgate Supplies")
+    assert a.customer_reply == "We are on it.\n\nSign-in service support"
