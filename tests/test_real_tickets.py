@@ -216,3 +216,14 @@ def test_command_line_errors_are_clear(world, tmp_path, capsys):
     f = write(tmp_path, {"tickets": [{"id": "a", "text": "x", "expect": {"runbook": 99}}]})
     assert rt.main(["--file", str(f), "--backend", "demo"]) == 2
     assert "runbook 99 does not exist" in capsys.readouterr().err
+
+
+def test_quotes_from_the_runbooks_are_a_separate_figure_in_the_report(world):
+    sample = next(l for l in world["retriever"].runbooks[15].sections["Symptom"].splitlines() if "redirected you too many times" in l)
+    quoting = diagnosis("redirect-loop", evidence=[{"line": sample.strip(), "why": "x"}, {"line": "made up entirely here today", "why": "y"}])
+    (row,) = run(world, [ticket("t", LOOPS, 15)], [quoting])
+    assert row.dropped == 2 and row.runbook_quoted == 1
+    meta = dict(date="d", backend="ollama", model="m", num_ctx=12288, file="f", sha256="ab" * 32, lab_commit="c")
+    text = rt.render_report([row], meta)
+    assert "- Quotes from the runbooks presented as evidence: 1 (in 1 answers). Other unverified quotes: 1" in text
+    assert "1 unverified quote(s); 1 quoted from a runbook" in text

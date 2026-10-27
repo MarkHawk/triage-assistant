@@ -330,3 +330,24 @@ def test_a_right_cause_line_passes_and_keeps_high_confidence(causes):
     assert violations == [] and answer.confidence == "high"
     wrong, v2 = check(raw(outcome="clock-skew", evidence=[], confidence="high", likely_cause=causes[13].split("\n")[0]), c)
     assert wrong.confidence == "medium" and any(v.startswith("CAUSE:") for v in v2)  # documented text alone is not enough
+
+
+# --- a dropped quote that is the runbook's own text is labelled as such -----------------------------------
+
+def test_a_quote_taken_from_a_runbook_is_labelled_and_an_invented_one_is_not():
+    from triage.answer import RUNBOOK_QUOTE, Reference
+
+    sample = "2026-10-20 17:48:21,893 WARN [org.keycloak.events] type=LOGIN_ERROR error=invalid_authn_request reason=invalid_destination"
+    ref = Reference([f"## Symptom\n```\n{sample}\n```\nThe partner system calls the route as it always has. The TLS handshake succeeds."])
+    c = ctx(logs="", ticket="Our SAML app says Invalid Request.", reference=ref)
+    answer, _ = check(raw(evidence=[{"line": sample, "why": "x"},
+                                    {"line": "The partner system calls the route as it always has, and the TLS handshake succeeds.", "why": "y"},
+                                    {"line": "An error line nobody ever wrote anywhere at all today", "why": "z"}]), c)
+    assert len(answer.dropped_evidence) == 3 and answer.runbook_quotes == answer.dropped_evidence[:2]
+    text = render(answer)
+    assert text.count(RUNBOOK_QUOTE) == 2 and f"nobody ever wrote anywhere at all today`\n" in text + "\n"
+
+
+def test_without_runbook_text_to_compare_nothing_is_labelled():
+    answer, _ = check(raw(evidence=[{"line": "event=made_up_line", "why": "x"}]), ctx())
+    assert answer.dropped_evidence and answer.runbook_quotes == []

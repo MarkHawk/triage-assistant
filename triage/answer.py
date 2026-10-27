@@ -85,6 +85,7 @@ class Answer:
     source: str = "model"  # "model" or "offline" (built by code, no model)
     kind: str = "answer"  # "answer", or "service_request" for an account request that is not a fault
     dropped_evidence: list[str] = field(default_factory=list)  # quoted lines that could not be verified
+    runbook_quotes: list[str] = field(default_factory=list)  # those of them that are the runbooks' own text
 
     @property
     def asserts_cause(self) -> bool:
@@ -103,6 +104,7 @@ class Context:
     ticket_was_flagged: bool = False
     persona: str = "vendor"  # "vendor" or "internal"; see rules.py
     causes: dict[int, str] = field(default_factory=dict)  # runbook -> its own one-sentence root cause (and title)
+    reference: "Reference | None" = None  # the runbooks' text, to tell a quote from a runbook apart from an invented one
     documented: dict[int, tuple[str, ...]] = field(default_factory=dict)  # runbook -> its documented error lines
     confirming: str = ""  # a question that would confirm the top runbook, for repairs
 
@@ -122,6 +124,34 @@ def _squash(text: str) -> str:
 
 def _strings(value: object) -> list[str]:
     return [s for s in (_clean(v) for v in (value if isinstance(value, list) else [])) if s]
+
+
+_SHINGLE = 6  # words in a run that must match
+
+
+def _shingles(text: str) -> set[tuple[str, ...]]:
+    words = re.findall(r"[a-z0-9_]+", _squash(text).lower())
+    return {tuple(words[i:i + _SHINGLE]) for i in range(max(len(words) - _SHINGLE + 1, 0))}
+
+
+class Reference:
+    """All the runbooks' text, for asking "did this quote come from a runbook?" """
+
+    def __init__(self, texts: list[str]):
+        joined = "\n".join(texts)
+        self._text = _squash(joined).lower()
+        self._shingles = _shingles(joined)
+
+    def contains(self, quote: str) -> bool:
+        """True if the quote is in a runbook, word for word or nearly: at least half its six-word runs appear there."""
+        squashed = _squash(quote).lower()
+        if len(squashed) >= 20 and squashed in self._text:
+            return True
+        runs = _shingles(quote)
+        return bool(runs) and len(runs & self._shingles) >= 0.5 * len(runs)
+
+
+RUNBOOK_QUOTE = "quoted the runbook's own example, not the ticket or logs"
 
 
 class AnswerError(ValueError):
@@ -175,6 +205,7 @@ def check(raw: dict, ctx: Context) -> tuple[Answer, list[str]]:
         customer_reply=_clean(raw.get("customer_reply")),
         questions_for_customer=_strings(raw.get("questions_for_customer")),
         possibilities=possibilities, warnings=warnings, dropped_evidence=dropped,
+        runbook_quotes=[q for q in dropped if ctx.reference is not None and ctx.reference.contains(q)],
     )
 
     strip_placeholders(answer)
@@ -400,5 +431,7 @@ def render(answer: Answer, flags: list[str] | None = None) -> str:
             n = len(answer.dropped_evidence)
             out.append(f"- {n} quoted line{'s were' if n != 1 else ' was'} not found word for word in the supplied text, "
                        f"so {'they were' if n != 1 else 'it was'} dropped from the evidence above. Treat {'them' if n != 1 else 'it'} as unverified:")
-            out.extend(f"  - `{line[:300]}{'...' if len(line) > 300 else ''}`" for line in answer.dropped_evidence)
+            for line in answer.dropped_evidence:
+                label = f" ({RUNBOOK_QUOTE})" if line in answer.runbook_quotes else ""
+                out.append(f"  - `{line[:300]}{'...' if len(line) > 300 else ''}`{label}")
     return "\n".join(out).rstrip() + "\n"

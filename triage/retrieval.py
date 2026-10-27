@@ -132,6 +132,9 @@ class Retriever:
         """vocabulary: extra known words (the company's system names), so they don't count as unknown."""
         self.runbooks = runbooks
         self.documented = documented_lines(runbooks)  # the error text each runbook shows, unique to it
+        from .answer import Reference  # answer imports retrieval lazily, so this one is local too
+
+        self.reference = Reference(["\n".join(b.sections.values()) for b in runbooks.values()])
         self.scenarios = scenarios or {}
         self.entries = _load_entries(phrases_path or REPO_ROOT / "data" / "phrases.yaml")
         self._tf: dict[int, Counter[str]] = {}

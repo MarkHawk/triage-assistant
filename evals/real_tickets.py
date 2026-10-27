@@ -126,6 +126,7 @@ class Row:
     code_fallback: bool = False
     warnings: int = 0
     dropped: int = 0
+    runbook_quoted: int = 0  # of the dropped quotes, those taken from a runbook's own text
     seconds: float = 0.0
     error: str = ""
     rendered: str = ""
@@ -147,6 +148,7 @@ def score(ticket: RealTicket, result: Triage, scenarios: dict[str, Scenario]) ->
     row.possibilities = [p.runbook_number for p in a.possibilities]
     row.attempts, row.code_fallback = result.attempts, result.code_fallback
     row.warnings, row.dropped = len(a.warnings), len(a.dropped_evidence)
+    row.runbook_quoted = len(a.runbook_quotes)
     if result.mode in ("clarify", "request"):
         row.cause = "n/a"
     else:
@@ -203,6 +205,8 @@ def render_report(rows: list[Row], meta: dict) -> str:
            f"- Mode appropriate: {sum(r.mode_right for r in done)} of {n}"
            + ("" if all(r.ticket.mode_was_given for r in rows) else " (where `expect.mode` was not given, diagnose is expected when a runbook is, clarify when none is)"),
            f"- Cause right: {sum(r.cause == 'right' for r in diag)} of {len(diag)} diagnosed (the other {len(done) - len(diag)} were clarify answers, which assert no cause)",
+           f"- Quotes from the runbooks presented as evidence: {sum(r.runbook_quoted for r in done)} "
+           f"(in {sum(1 for r in done if r.runbook_quoted)} answers). Other unverified quotes: {sum(r.dropped - r.runbook_quoted for r in done)}",
            f"- Errors: {sum(bool(r.error) for r in rows)}",
            "- Send-ready: fill in the last column, then run `python -m evals.real_tickets --summarise <this file>`", "",
            "## Results", "",
@@ -217,8 +221,10 @@ def render_report(rows: list[Row], meta: dict) -> str:
             notes.append("retried")
         if r.code_fallback:
             notes.append("built by code")
-        if r.dropped:
-            notes.append(f"{r.dropped} unverified quote(s)")
+        if r.dropped - r.runbook_quoted:
+            notes.append(f"{r.dropped - r.runbook_quoted} unverified quote(s)")
+        if r.runbook_quoted:
+            notes.append(f"{r.runbook_quoted} quoted from a runbook")
         if r.mode == "clarify" and r.ticket.runbooks:
             notes.append("listed: " + (", ".join(f"{p:02d}" for p in r.possibilities) or "none"))
         out.append(f"| {r.ticket.id} | {_expected(r.ticket)} | {_retrieved(r)} | {_yn(r.retrieval_right)} | {r.mode} ({r.ticket.mode}) "
