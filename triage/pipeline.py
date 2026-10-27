@@ -73,7 +73,7 @@ def run_triage(ticket_text: str, logs_text: str, *, backend: Backend, retriever:
     # A quote may come from the logs as the model saw them (tidied) or as supplied.
     ctx = ans.Context(mode=mode, logs=logs_text + "\n" + tidy_logs(logs_text), ticket=masked.text, scenario_runbooks=scenario_runbooks,
                       retrieved=retrieved, user_side_hint=bool(result.hints), ticket_was_flagged=masked.flagged,
-                      persona=persona, customer_side=rules.customer_side(masked.text),
+                      persona=persona, causes={n: b.cause_statement + "\n" + b.title for n, b in retriever.runbooks.items()},
                       documented=retriever.documented, confirming=confirming)
 
     prompt = build_prompt(system_text, mode, masked.text, logs_text, list(result.matches), result.hints,
@@ -99,7 +99,7 @@ def run_triage(ticket_text: str, logs_text: str, *, backend: Backend, retriever:
         feedback = "Your previous reply broke these rules, so it was discarded: " + "; ".join(violations) + ". Reply again."
 
     # Out of attempts. Rule breaks that code can put right are put right; anything else is not kept.
-    fixable = (*rules.REPAIRABLE, ans.CONTRADICTION)
+    fixable = (*rules.REPAIRABLE, ans.CONTRADICTION, ans.CAUSE)
     unfixable = [v for v in violations if not v.startswith(fixable)]
     if answer is not None and not unfixable:
         if any(v.startswith(ans.CONTRADICTION) for v in violations):
@@ -108,6 +108,10 @@ def run_triage(ticket_text: str, logs_text: str, *, backend: Backend, retriever:
                                       + next(v for v in violations if v.startswith(ans.CONTRADICTION)).removeprefix(ans.CONTRADICTION).strip())
             flags.append("WARNING: this answer says not a lab fault although a runbook matched strongly and nothing points "
                          "to the user's side. Confidence was capped at low. Read it with care.")
+        if any(v.startswith(ans.CAUSE) for v in violations):
+            ans.repair_cause(answer, ctx)
+            flags.append("WARNING: the model's cause line did not match the runbook it diagnosed, even when asked again, so the "
+                         "runbook's own cause statement is shown and confidence is capped at medium.")
         changes = rules.repair(answer, ctx)
         if changes:
             flags.append("WARNING: the model broke the reply rules twice, so code corrected the answer (" + "; ".join(changes)

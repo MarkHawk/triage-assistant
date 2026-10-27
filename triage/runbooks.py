@@ -14,6 +14,7 @@ from pathlib import Path
 _TITLE = re.compile(r"^#\s+(\d+)\s*[·.:-]\s*(.+)$")
 _META_ROW = re.compile(r"^\|\s*\*\*(.+?)\*\*\s*\|\s*(.*?)\s*\|$")
 _CUSTOMER_LINE = re.compile(r"^How customers describe it:\s*(.+)$", re.MULTILINE)
+_CAUSE_LINE = re.compile(r"\*\*Root cause, in one sentence for the customer:\*\*\s*(.+)$", re.MULTILINE)
 
 # Order the sections are shown in, and how much of an excerpt each may use.
 _EXCERPT_ORDER = ("Symptom", "Diagnosis", "Fix", "Questions I'd ask the customer")
@@ -35,6 +36,12 @@ class Runbook:
         """The 'How customers describe it' paragraph, if the runbook has one."""
         match = _CUSTOMER_LINE.search(self.sections.get("Symptom", ""))
         return match.group(1) if match else ""
+
+    @property
+    def cause_statement(self) -> str:
+        """The runbook's own one-sentence root cause ("Root cause, in one sentence for the customer")."""
+        match = _CAUSE_LINE.search(self.sections.get("Diagnosis", ""))
+        return match.group(1).strip() if match else ""
 
     def header(self) -> str:
         parts = [f"# {self.number:02d} · {self.title}", f"File: {self.path}"]

@@ -1,5 +1,6 @@
 import pytest
 import yaml
+from helpers import runbook_cause
 
 from evals import real_tickets as rt
 from triage.backends.base import Backend, BackendError
@@ -89,7 +90,8 @@ def world():
 
 
 def diagnosis(outcome, **kw):
-    base = {"outcome": outcome, "confidence": "high", "likely_cause": "The proxy dropped the header.", "evidence": [],
+    cause = runbook_cause(outcome) if outcome not in ("not_a_lab_fault", "needs_more_info") else "Nothing in the lab."
+    base = {"outcome": outcome, "confidence": "high", "likely_cause": cause, "evidence": [],
             "fix_steps": ["Restore it."], "customer_reply": "The most likely cause is a change to the proxy headers. Did anything change on the proxy recently?", "questions_for_customer": [], "possibilities": []}
     return {**base, **kw}
 

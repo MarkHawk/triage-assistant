@@ -4,6 +4,7 @@ import json
 
 import pytest
 import yaml
+from helpers import runbook_cause
 
 from triage.answer import clarify_violations, Context
 from triage.backends.base import Backend, BackendError
@@ -117,7 +118,7 @@ def test_a_password_reset_request_is_a_service_request_not_a_diagnosis(world):
 # --- strong matches: a cause may be stated -----------------------------------------------------
 
 DIAGNOSIS = {"outcome": "redirect-loop", "confidence": "high",
-             "likely_cause": "The proxy stopped sending X-Forwarded-Proto to the edge app, so it keeps redirecting to HTTPS.",
+             "likely_cause": runbook_cause("redirect-loop"),
              "evidence": [{"line": LOOP_LOG, "why": "scheme=http with no forwarded protocol"}],
              "fix_steps": ["Repeat the forwarded headers in the location, or remove the extra proxy_set_header."],
              "customer_reply": "The most likely cause is a change to the proxy headers. Did anything change on the proxy recently?", "questions_for_customer": [], "possibilities": []}
@@ -316,7 +317,7 @@ def test_a_contradiction_that_survives_the_retry_is_kept_but_capped_and_flagged(
 WIFI = ("We replaced our old wireless controller on Monday. Staff can't join the staff SSID, the controller just says the RADIUS "
         "server timed out. Guest wifi is fine.")
 WIFI_BAD = {**DIAGNOSIS, "outcome": "radius-shared-secret-mismatch", "evidence": [], "confidence": "medium",
-            "likely_cause": "The shared secret on the controller differs from the server's.",
+            "likely_cause": runbook_cause("radius-shared-secret-mismatch"),
             "customer_reply": "We will update the shared secret. Please confirm the current shared secret and we will proceed.",
             "fix_steps": ["Which NAS is failing?", "Run scripts/fix.sh radius-shared-secret-mismatch"]}
 WIFI_GOOD = {**WIFI_BAD, "customer_reply": "The most likely cause is that the shared secret on your controller no longer matches. "
@@ -329,7 +330,7 @@ def test_a_reply_that_asks_for_a_secret_is_sent_back_with_the_reasons_and_the_go
     result = triage(world, WIFI, backend=backend)
     assert result.attempts == 2 and result.answer.warnings == [] and not any("corrected" in f for f in result.flags)
     fed_back = backend.prompts[1].user
-    for reason in ("asks for a secret", "customer's own", "fix step 1 is a question", "specific to the lab"):
+    for reason in ("asks for a secret", "the ticket calls the customer's", "fix step 1 is a question", "specific to the lab"):
         assert reason in fed_back, reason
 
 
@@ -353,8 +354,7 @@ def test_the_corrected_answer_passes_every_rule(world):
     from triage.answer import Context
 
     result = triage(world, WIFI, backend=Scripted(world["guard"], [WIFI_BAD, WIFI_BAD]))
-    ctx = Context(mode="diagnose", logs="", ticket=WIFI, scenario_runbooks={}, retrieved={}, persona="vendor",
-                  customer_side=rules.customer_side(WIFI))
+    ctx = Context(mode="diagnose", logs="", ticket=WIFI, scenario_runbooks={}, retrieved={}, persona="vendor")
     assert rules.content_violations(result.answer, ctx) == []
 
 
@@ -378,13 +378,14 @@ def test_an_account_request_is_answered_by_code_and_the_model_is_never_asked(wor
 
 def test_a_request_word_does_not_hide_a_real_fault_that_matched_strongly(world):
     ticket = "Since the proxy change everyone gets 502 Bad Gateway at sign-in, and one person is locked out as well."
-    backend = Scripted(world["guard"], [{**DIAGNOSIS, "outcome": "proxy-bad-gateway", "evidence": [], "confidence": "medium"}])
+    backend = Scripted(world["guard"], [{**DIAGNOSIS, "outcome": "proxy-bad-gateway", "evidence": [], "confidence": "medium",
+                                         "likely_cause": runbook_cause("proxy-bad-gateway")}] * 2)
     result = triage(world, ticket, backend=backend)
     assert result.mode == "diagnose" and len(backend.prompts) >= 1
 
 
 CLOCK_ERROR = "Users see: Could not validate timestamp: expired. Check system clock."
-CLOCK_REPLY = {**DIAGNOSIS, "outcome": "clock-skew", "evidence": [], "confidence": "high",
+CLOCK_REPLY = {**DIAGNOSIS, "outcome": "clock-skew", "evidence": [], "confidence": "high", "likely_cause": runbook_cause("clock-skew"),
                "customer_reply": "The cause is a clock difference on the application server. We recommend checking its time."}
 
 
