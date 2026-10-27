@@ -194,6 +194,6 @@ def test_the_diagnose_prompt_carries_a_hedged_reply_example_and_it_follows_the_r
                      fix_steps=[], customer_reply=DIAGNOSE_REPLY_EXAMPLE, questions_for_customer=[], possibilities=[])
     from triage.answer import Context
 
-    ctx = Context(mode="diagnose", logs="", ticket="", scenario_runbooks={}, retrieved={}, persona="vendor",
-                  customer_side=("our server",))
+    ctx = Context(mode="diagnose", logs="", ticket="Since Monday our server rejects the certificate.", scenario_runbooks={},
+                  retrieved={}, persona="vendor")
     assert rules.content_violations(example, ctx) == []

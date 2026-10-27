@@ -13,7 +13,7 @@ HEDGED = "The most likely cause is a mismatched secret. Has the controller been 
 
 def ctx(**kw):
     base = dict(mode="diagnose", logs="", ticket="t", scenario_runbooks={"radius-shared-secret-mismatch": PATH}, retrieved=RETRIEVED,
-                persona="vendor", customer_side=(), confirming="Which controller is failing?")
+                persona="vendor", confirming="Which controller is failing?")
     base.update(kw)
     return Context(**base)
 
@@ -92,7 +92,7 @@ def test_customer_side_components_are_recognised_in_the_ticket(ticket, found):
     assert bool(rules.customer_side(ticket)) is found
 
 
-VENDOR_CTX = dict(customer_side=("our old wireless controller",))
+VENDOR_CTX = dict(ticket="We replaced our old wireless controller on Monday. Staff cannot join the wifi.")
 
 
 def test_a_vendor_may_not_promise_to_change_something_on_the_customers_side():
@@ -112,7 +112,7 @@ def test_ordinary_promises_and_recommendations_are_fine(sentence):
 def test_the_persona_rule_applies_only_to_a_vendor_and_only_when_the_ticket_mentions_their_estate():
     a = answer(customer_reply="We will update the shared secret. " + HEDGED)
     assert "PERSONA" not in kinds(content_violations(a, ctx(persona="internal", **VENDOR_CTX)))
-    assert "PERSONA" not in kinds(content_violations(a, ctx(customer_side=())))
+    assert "PERSONA" not in kinds(content_violations(a, ctx(ticket="Staff cannot join the wifi.")))
 
 
 # --- WORDING ---------------------------------------------------------------------------------------
@@ -205,3 +205,81 @@ def test_question_steps_are_caught_and_moved_to_the_customer_questions():
 def test_a_service_request_answer_is_exempt():
     a = answer(kind="service_request", customer_reply="Keycloak. Send us your password.", fix_steps=["Which?"])
     assert content_violations(a, ctx()) == [] and repair(a, ctx()) == []
+
+
+# --- OWNERSHIP both ways (the t03, t16 and t18 cases, with tickets written for the test) -----------------
+
+T03 = ("We replaced our old wireless controller with a new one on Monday. Staff can't join the staff SSID. "
+       "Can you check your RADIUS server is actually up?")
+T16 = 'We are getting your "Sign-in is down for planned maintenance" page, but your status email said the work finished at 6am.'
+T18 = 'Our single-page app shows "Failed to fetch" when calling your API, but the same request in Postman returns data.'
+
+
+def owned(ticket, reply, persona="vendor"):
+    a = answer(customer_reply=reply)
+    c = ctx(ticket=ticket, persona=persona)
+    return a, c, [v for v in content_violations(a, c) if v.startswith("PERSONA")]
+
+
+def test_the_ticket_says_what_is_ours_and_what_is_theirs():
+    owners = rules.ownership(T03)
+    assert owners[("radius", "server")] == rules.OURS and owners[("old", "wireless", "controller")] == rules.THEIRS
+    assert rules.ownership(T18)[("api",)] == rules.OURS and rules.ownership(T18)[("single-page", "app")] == rules.THEIRS
+    both = rules.ownership("Your server is fine but our server is not.")
+    assert both[("server",)] == ""  # "the server" alone could be either, so it is left unresolved
+
+
+def test_t03_asking_the_customer_to_check_our_radius_server_is_caught_and_split():
+    reply = "Please check the shared secret on both the new controller and the RADIUS server. " + HEDGED
+    a, c, v = owned(T03, reply)
+    assert v and "RADIUS server" in v[0] and "calls ours" in v[0]
+    repair(a, c)
+    assert "We will check the RADIUS server on our side, and we recommend that you check the new controller on yours." in a.customer_reply
+    assert [x for x in content_violations(a, c) if x.startswith("PERSONA")] == []
+
+
+def test_t16_telling_the_customer_to_fix_our_maintenance_mode_is_caught():
+    reply = ("The most likely cause is that the proxy was left in maintenance mode. We recommend turning maintenance mode off on the "
+             "proxy and verifying that sign-in works. Did it start after the upgrade?")
+    a, c, v = owned(T16, reply)
+    assert v and "points only at our side" in v[0]
+    repair(a, c)
+    assert "We will turn maintenance mode off on the proxy and verify that sign-in works." in a.customer_reply
+    assert [x for x in content_violations(a, c) if x.startswith("PERSONA")] == []
+
+
+def test_t18_naming_our_api_without_saying_what_we_will_do_is_caught():
+    reply = ("The most likely cause is that the API's CORS setting does not match the origin of the web app. Please check the "
+             "browser's developer console for the exact error. Does the same request work from curl?")
+    a, c, v = owned(T18, reply)
+    assert len(v) == 1 and "never says what we will check or fix" in v[0]  # the console is theirs, so asking about it is fine
+    repair(a, c)
+    assert "We will check the API on our side and let you know what we find." in a.customer_reply
+    assert [x for x in content_violations(a, c) if x.startswith("PERSONA")] == []
+
+
+@pytest.mark.parametrize("ticket,reply", [
+    (T03, "We will check the RADIUS server's client entry for your new controller. Please check the shared secret on your controller."),
+    (T03, "We will check our RADIUS server. We recommend that you compare the secret on your new controller."),
+    (T18, "We will check the API's CORS setting today. Please check the browser's developer console for the exact error."),
+    (T16, "We will turn maintenance mode off on the proxy and confirm sign-in works. We will let you know when it is done."),
+])
+def test_replies_that_get_ownership_right_pass(ticket, reply):
+    assert owned(ticket, reply + " " + HEDGED)[2] == []
+
+
+def test_promising_work_on_the_customers_things_is_still_caught():
+    a, c, v = owned(T03, "We will update the shared secret on the new controller. " + HEDGED)
+    assert v and 'the ticket calls the customer' in v[0]
+    repair(a, c)
+    assert "We recommend that you update the shared secret on the new controller." in a.customer_reply
+
+
+def test_an_internal_persona_has_no_ownership_rules():
+    assert owned(T03, "Please check the RADIUS server. We will update your controller. " + HEDGED, persona="internal")[2] == []
+
+
+def test_in_the_reply_our_and_your_flip():
+    """The reply speaks for us: "our RADIUS server" is ours, "your controller" is theirs."""
+    assert owned(T03, "Please check our RADIUS server logs. " + HEDGED)[2]  # asking them to check ours
+    assert not owned(T03, "Please check your controller's shared secret. We will check our RADIUS server. " + HEDGED)[2]

@@ -4,7 +4,8 @@ Each rule has a check that returns violations (a model is sent them and asked ag
 applies if the model still breaks the rule on its second attempt, so a broken answer never reaches anyone.
 
   SECRETS   a customer reply never asks for a password, shared secret, key, token or cookie
-  PERSONA   as a vendor, nothing is promised on the customer's own side ("we will" becomes "we recommend")
+  PERSONA   as a vendor, "we will" for our own things ("your API" in the ticket), "please check" or "we recommend"
+            for the customer's ("our server" in the ticket)
   WORDING   below high confidence the reply says "most likely" and asks a confirming question
   LABTERM   nothing specific to the lab (scripts, .state, LAB_HOST, docker compose, Keycloak)
   STEPS     fix steps are actions, not questions
@@ -48,22 +49,204 @@ def secret_requests(text: str) -> list[str]:
     return [s for s in sentences(text) if _ASKS.search(s) and not _NEGATED.search(s)]
 
 
-# --- PERSONA ---------------------------------------------------------------------------------------
+# --- PERSONA and OWNERSHIP (vendor persona only) --------------------------------------------------
+#
+# Whose is a thing? In the ticket, "your API" is ours (the vendor's) and "our server" is the customer's. In the
+# reply the words flip: "our RADIUS server" is ours, "your controller" is theirs. A plain "the RADIUS server" in
+# the reply takes the owner the ticket gave the same thing. A vendor promises work on its own things ("we will
+# check") and recommends it on the customer's ("please check", "we recommend").
 
-_CUSTOMER_SIDE = re.compile(
-    r"\b(?:our|my|their|the customer'?s|your own)\s+(?:[\w-]+\s+){0,2}?(?:servers?|proxy|proxies|firewalls?|networks?|"
-    r"load balancers?|gateways?|routers?|switch(?:es)?|controllers?|machines?|laptops?|pcs?|devices?|integrations?|"
-    r"environments?|infrastructure|systems?|apps?|applications?|side|end|vpn|dns)\b|\b(?:on|at) our (?:side|end)\b",
-    re.IGNORECASE)
+OURS, THEIRS = "ours", "theirs"
+_THING_NOUNS = {
+    "server", "servers", "api", "apis", "idp", "page", "app", "apps", "application", "applications", "proxy", "controller",
+    "network", "firewall", "certificate", "certificates", "portal", "endpoint", "service", "system", "systems", "laptop", "pc",
+    "device", "devices", "integration", "gateway", "site", "website", "email", "side", "end", "router", "switch", "vpn", "dns",
+    "environment", "infrastructure", "machine", "cluster", "browser", "console", "balancer"}
+_DEFAULT_THEIRS = {"browser", "console", "laptop", "pc", "device", "devices"}  # the customer's unless the ticket says otherwise
+_TOKEN = re.compile(r"[A-Za-z][\w'-]*|[^\w\s]")
+
+
+def _word(token: str) -> str:
+    return re.sub(r"'s$", "", token.lower())
+
+
+def _things(text: str):
+    """(index of the determiner, determiner, words) for each thing named after a determiner, such as "your RADIUS server"."""
+    tokens = _TOKEN.findall(text)
+    found = []
+    for i, token in enumerate(tokens):
+        if token.lower() not in ("your", "our", "my", "their", "the"):
+            continue
+        for j in range(i + 1, min(i + 5, len(tokens))):
+            if not tokens[j][:1].isalpha():
+                break
+            if _word(tokens[j]) in _THING_NOUNS:
+                name = " ".join(tokens[i + 1:j] + [re.sub(r"'s$", "", tokens[j])])
+                found.append((i, token.lower(), tuple(_word(t) for t in tokens[i + 1:j + 1]), name))
+                break
+    return tokens, found
+
+
+_GENERIC_HEADS = {"page", "side", "end", "service", "system", "systems", "site", "email"}  # need the full name to match
+
+
+def ownership(ticket: str) -> dict[tuple[str, ...], str]:
+    """What the ticket calls ours ("your ...") and theirs ("our ...", "my ..."), keyed by the words naming it and by
+    the last word alone. A key the ticket gives both owners maps to "" (unresolved)."""
+    seen: dict[tuple[str, ...], set[str]] = {}
+    for _, det, words, _ in _things(ticket)[1]:
+        owner = OURS if det == "your" else THEIRS if det in ("our", "my") else None
+        if owner:
+            for key in {words, words[-1:]}:
+                seen.setdefault(key, set()).add(owner)
+    return {key: (owners.pop() if len(owners) == 1 else "") for key, owners in seen.items()}
+
+
+def _owner_in_reply(det: str, words: tuple[str, ...], owners: dict) -> str | None:
+    if det == "our":
+        return OURS
+    if det in ("your", "their"):
+        return THEIRS
+    owner = owners.get(words)
+    if owner is None and words[-1] not in _GENERIC_HEADS:
+        owner = owners.get(words[-1:])
+    if owner:
+        return owner
+    return THEIRS if words[-1] in _DEFAULT_THEIRS else None
+
+
+_ASK_VERB = (r"(?:check|verify|turn|switch|restart|reload|change|update|fix|reconfigure|disable|enable|remove|rotate|renew|correct|"
+             r"set|review|confirm|compare|ensure|make sure|look at)")
+_FIX_VERB = r"(?:turn|switch|restart|reload|change|update|fix|reconfigure|disable|enable|remove|rotate|renew|correct|set)"
+_DEFER = re.compile(rf"\b(?:please|kindly|you should|you may want to|you might want to|could you|can you|would you)\s+(?:also\s+)?{_ASK_VERB}\w*"
+                    rf"|\bwe (?:recommend|suggest|advise)(?: that you)?\s+(?:also\s+)?{_ASK_VERB}\w*", re.IGNORECASE)
+_DEFER_FIX = re.compile(rf"\b(?:please|kindly|you should|you may want to|you might want to|could you|can you|would you)\s+(?:also\s+)?{_FIX_VERB}\w*"
+                        rf"|\bwe (?:recommend|suggest|advise)(?: that you)?\s+(?:also\s+)?{_FIX_VERB}\w*", re.IGNORECASE)
+_WE_WILL = re.compile(r"\b(?:we will|we'll|we are going to|we're going to)\s+(?:\w+\s+){0,2}?"
+                      r"(?:check|fix|look|investigate|correct|review|update|change|turn|switch|restart|reload|repair|verify)\w*", re.IGNORECASE)
 _PROMISE = re.compile(
     r"\b(?:we will|we'll|we shall|we are going to|we're going to|we can|our team will|we plan to)\s+(?:then\s+|also\s+|now\s+)?"
     r"(?=(?:fix|change|update|reconfigure|restart|reload|adjust|correct|replace|renew|rotate|configure|apply|remove|add|set|"
     r"check|repair|modify|amend|enable|disable|re-?issue|install|upgrade|patch|reset)\b(?!\s+you\b))", re.IGNORECASE)
 
 
+def _objects(sentence: str, owners: dict) -> list[tuple[str | None, str]]:
+    """(owner, name) for what each "please check" or "we recommend" in the sentence is about: the first thing after
+    the verb, and anything joined to it by "and" or "or" ("both the new controller and the RADIUS server")."""
+    out = []
+    tokens, things = _things(sentence)
+    starts = {i: (det, words, name) for i, det, words, name in things}
+    for match in _DEFER.finditer(sentence):
+        after = len(_TOKEN.findall(sentence[:match.end()]))
+        chain = False
+        for i in sorted(k for k in starts if k >= after):
+            between = [t.lower() for t in tokens[after:i]]
+            if chain and not set(between) <= {"and", "or", "both", "either", ","}:
+                break
+            det, words, name = starts[i]
+            out.append((_owner_in_reply(det, words, owners), name))
+            chain, after = True, i + len(words) + 1
+    return out
+
+
+def _mentions(sentence: str, owners: dict) -> set[str]:
+    return {o for _, det, words, _ in _things(sentence)[1] if (o := _owner_in_reply(det, words, owners))}
+
+
 def customer_side(ticket: str) -> tuple[str, ...]:
-    """Parts of the customer's own estate that the ticket mentions ("our server", "on our side")."""
-    return tuple(dict.fromkeys(m.group(0).lower() for m in _CUSTOMER_SIDE.finditer(ticket)))
+    """The things the ticket calls the customer's own ("our server", "my laptop")."""
+    return tuple(dict.fromkeys(name for _, det, _, name in _things(ticket)[1] if det in ("our", "my")))
+
+
+def ownership_violations(answer: Answer, ctx: Context) -> list[str]:
+    if ctx.persona != "vendor":
+        return []
+    owners = ownership(ctx.ticket)
+    ours = {w for w, o in owners.items() if o == OURS}
+    theirs = {w for w, o in owners.items() if o == THEIRS}
+    out = []
+    for sentence in sentences(answer.customer_reply):
+        objects = _objects(sentence, owners)
+        mine = [name for owner, name in objects if owner == OURS]
+        if mine:
+            out.append(f'{PERSONA} the reply says "{sentence[:90]}", asking the customer to act on "{mine[0]}", which the ticket '
+                       'calls ours ("your ..."). Say what we will check or fix instead')
+        elif _DEFER_FIX.search(sentence) and not objects_owned(objects) and ours and not theirs:
+            out.append(f'{PERSONA} the reply says "{sentence[:90]}", asking the customer to fix something, but the ticket points '
+                       'only at our side. Say what we will do')
+        mentioned = _mentions(sentence, owners)
+        if _PROMISE.search(sentence) and OURS not in mentioned and (THEIRS in mentioned or (theirs and not ours)):
+            out.append(f'{PERSONA} the reply says "{sentence[:90]}", promising work on something the ticket calls the customer\'s '
+                       '("our ..."). Write "please check" or "we recommend" instead')
+    reply_ours = any(OURS in _mentions(s, owners) for s in sentences(answer.customer_reply))
+    if ours and reply_ours and not _WE_WILL.search(answer.customer_reply):
+        out.append(f"{PERSONA} the reply names something the ticket calls ours but never says what we will check or fix. "
+                   'Add, for example, "we will check the ... on our side"')
+    return out
+
+
+def objects_owned(objects) -> bool:
+    return any(owner for owner, _ in objects)
+
+
+_ING = {"checking": "check", "turning": "turn", "verifying": "verify", "restarting": "restart", "reloading": "reload",
+        "changing": "change", "updating": "update", "fixing": "fix", "disabling": "disable", "enabling": "enable",
+        "removing": "remove", "rotating": "rotate", "renewing": "renew", "correcting": "correct", "setting": "set",
+        "reviewing": "review", "confirming": "confirm", "comparing": "compare", "switching": "switch", "ensuring": "ensure",
+        "reconfiguring": "reconfigure", "making": "make", "looking": "look"}
+
+
+def _to_we_will(sentence: str) -> str:
+    """ "Please check X" / "We recommend turning X off" / "Could you restart X?" becomes "We will check X" and so on."""
+    patterns = [
+        (re.compile(r"\b(?:please|kindly)\s+(?:also\s+)?(\w+)", re.I), lambda m: "we will " + m.group(1)),
+        (re.compile(r"\bwe (?:recommend|suggest|advise) that you\s+", re.I), lambda m: "we will "),
+        (re.compile(r"\bwe (?:recommend|suggest|advise)\s+(\w+ing)\b", re.I), lambda m: "we will " + _ING.get(m.group(1).lower(), "check")),
+        (re.compile(r"\b(?:you should|you may want to|you might want to)\s+", re.I), lambda m: "we will "),
+        (re.compile(r"\b(?:could|can|would) you(?: please)?\s+", re.I), lambda m: "we will "),
+    ]
+    for pattern, repl in patterns:
+        if pattern.search(sentence):
+            out = pattern.sub(repl, sentence, count=1)
+            out = re.sub(r"\band (\w+ing)\b", lambda m: "and " + _ING.get(m.group(1).lower(), m.group(1)), out)
+            out = out[:1].upper() + out[1:]
+            return out[:-1] + "." if out.endswith("?") else out
+    return "We will check this on our side."
+
+
+def ownership_repair(answer: Answer, ctx: Context, note) -> None:
+    if ctx.persona != "vendor":
+        return
+    owners = ownership(ctx.ticket)
+    ours = {w for w, o in owners.items() if o == OURS}
+    theirs = {w for w, o in owners.items() if o == THEIRS}
+    changed = False
+
+    def fix(sentence: str) -> str:
+        nonlocal changed
+        objects = _objects(sentence, owners)
+        mine = [name for owner, name in objects if owner == OURS]
+        yours = [name for owner, name in objects if owner == THEIRS]
+        if mine and yours:
+            changed = True
+            return f"We will check the {mine[0]} on our side, and we recommend that you check the {yours[0]} on yours."
+        if mine or (_DEFER_FIX.search(sentence) and not objects_owned(objects) and ours and not theirs):
+            changed = True
+            return _to_we_will(sentence)
+        mentioned = _mentions(sentence, owners)
+        if _PROMISE.search(sentence) and OURS not in mentioned and (THEIRS in mentioned or (theirs and not ours)):
+            changed = True
+            return _PROMISE.sub(lambda m: "We recommend that you " if m.group(0)[:1].isupper() else "we recommend that you ", sentence)
+        return sentence
+
+    answer.customer_reply = _map_sentences(answer.customer_reply, fix)
+    if changed:
+        note("changed who does what in the reply: we check or fix our own things, and recommend on the customer's")
+    reply_ours = [name for s in sentences(answer.customer_reply) for _, det, words, name in _things(s)[1]
+                  if _owner_in_reply(det, words, owners) == OURS]
+    if ours and reply_ours and not _WE_WILL.search(answer.customer_reply):
+        answer.customer_reply = (answer.customer_reply.rstrip() + f" We will check the {reply_ours[0]} on our side and let you know what we find.")
+        note("added what we will check on our side")
 
 
 # --- WORDING ---------------------------------------------------------------------------------------
@@ -134,12 +317,7 @@ def content_violations(answer: Answer, ctx: Context) -> list[str]:
         for bad in secret_requests(text):
             out.append(f'{SECRETS} {where} says "{bad[:90]}", which asks for a secret. Never ask for a password, shared secret, '
                        "key, token or cookie: ask them to check or compare it, or to confirm they have changed it")
-    if ctx.persona == "vendor" and ctx.customer_side:
-        for sentence in sentences(answer.customer_reply):
-            if _PROMISE.search(sentence):
-                out.append(f'{PERSONA} the ticket describes {ctx.customer_side[0]!r} as the customer\'s own, but the reply says '
-                           f'"{sentence[:90]}". Do not promise to change or check anything on their side: write "please check" '
-                           'or "we recommend"')
+    out += ownership_violations(answer, ctx)
     if _needs_hedging(answer, ctx):
         problems = []
         if _ASSERTS.search(answer.customer_reply):
@@ -195,12 +373,8 @@ def repair(answer: Answer, ctx: Context) -> list[str]:
                 answer.questions_for_customer = kept
                 note(f"removed {len(value) - len(kept)} question(s) that asked for a secret")
 
-    # PERSONA: "we will update" becomes "we recommend that you update"
-    if ctx.persona == "vendor" and ctx.customer_side and _PROMISE.search(answer.customer_reply):
-        def soften(match: re.Match[str]) -> str:
-            return "We recommend that you " if match.group(0)[:1].isupper() else "we recommend that you "
-        answer.customer_reply = _PROMISE.sub(soften, answer.customer_reply)
-        note('changed "we will ..." to "we recommend that you ..." for something on the customer\'s side')
+    # PERSONA: we check or fix our own things, and recommend on the customer's
+    ownership_repair(answer, ctx, note)
 
     # STEPS: a question is moved to the customer questions
     actions, moved = [], []
