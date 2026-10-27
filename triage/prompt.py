@@ -86,16 +86,34 @@ def neutralise(text: str) -> str:
     return _TAGS.sub("[tag removed]", text)
 
 
-def load_system(company: str, systems: dict[str, System], path: Path | None = None) -> str:
+PERSONA_TEXT = {
+    "vendor": ("You work for the vendor of the sign-in service. The customer runs their own servers, proxies, networks and "
+               "applications. For anything the ticket calls theirs (our server, our side, our proxy, our network) never say that "
+               "we will change, restart, check or fix it: write \"please check\" or \"we recommend\". \"We will\" is fine "
+               "for our own sign-in service."),
+    "internal": ("You work for the customer's own IT team, so you can change any of these systems. \"We will\" is fine for "
+                 "work we can do ourselves."),
+}
+
+
+def load_system(company: str, systems: dict[str, System], persona: str = "vendor", path: Path | None = None) -> str:
     template = (path or REPO_ROOT / "prompts" / "system.md").read_text(encoding="utf-8")
+    template = template.replace("{{persona}}", PERSONA_TEXT[persona])
     lines = [f"- {s.display}: {s.protocol or 'supporting service'} ({', '.join(s.staff_say[:3])})" for s in systems.values()]
     return template.replace("{{company}}", company).replace("{{systems}}", "\n".join(lines)).strip()
 
 
+DIAGNOSE_REPLY_EXAMPLE = ("Thank you for the details. The most likely cause is that the sign-in service no longer trusts the "
+                          "certificate your server presents. Please check whether a certificate or security change was made on "
+                          "your side recently. Did anything change on your network shortly before this started?")
+
 _DIAGNOSE = """Mode: DIAGNOSE. At least one runbook below is a strong match.
 - You may state the likely cause, in likely_cause, with the log lines that prove it in evidence.
 - Pick the outcome from the strong matches. Weak matches are only possibilities: do not base the answer on one.
-- Fill fix_steps with short plain steps based on the runbook's Fix section.
+- Fill fix_steps with short plain actions based on the runbook's Fix section (never questions).
+- Unless your confidence is high, the reply says "the most likely cause is ..." and ends with one confirming question, taken from the runbook's customer questions. Without a quoted log line your confidence is not high. For a different ticket, the shape of such a reply: "{reply_example}"
+- Never ask for a password, shared secret, key, token or cookie.
+- Do not mention lab scripts, folders, LAB_HOST, docker or Keycloak anywhere.
 - possibilities must be an empty list: they are only for clarify mode.
 - customer_reply: tell the customer, in plain words, what we think is wrong and what we are doing about it. Ask them to do something only if the runbook needs it."""
 
@@ -126,7 +144,7 @@ def build_prompt(system_text: str, mode: str, ticket_text: str, logs_text: str, 
     """Assemble the request, trimming the ticket, logs and runbook extracts to the budget."""
     shown = list(matches)  # strong first (retrieval order); each is labelled
     hint_clause = ' (or "not_a_lab_fault" only if the hint below clearly applies)' if hints else ""
-    instructions = (_DIAGNOSE if mode == "diagnose" else
+    instructions = (_DIAGNOSE.replace("{reply_example}", DIAGNOSE_REPLY_EXAMPLE) if mode == "diagnose" else
                     _CLARIFY.replace("{hint_clause}", hint_clause).replace("{example}", json.dumps(CLARIFY_EXAMPLE, indent=1)))
     scaffold = "\n".join([instructions, "<ticket>", "</ticket>", "<logs>", "</logs>", "<runbooks>", "</runbooks>"])
     fixed = tokens(system_text) + tokens(scaffold) + tokens(ticket_note) + OVERHEAD_TOKENS

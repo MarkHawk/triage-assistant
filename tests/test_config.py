@@ -60,3 +60,10 @@ def test_log_secrets_defaults_to_mask_and_can_be_refuse(tmp_path):
     assert cfg(tmp_path, "LOG_SECRETS=refuse\n").log_secrets == "refuse"
     with pytest.raises(ConfigError):
         cfg(tmp_path, "LOG_SECRETS=ignore\n")
+
+
+def test_support_persona_defaults_to_vendor_and_can_be_internal(tmp_path):
+    assert cfg(tmp_path).support_persona == "vendor"
+    assert cfg(tmp_path, "SUPPORT_PERSONA=Internal\n").support_persona == "internal"
+    with pytest.raises(ConfigError):
+        cfg(tmp_path, "SUPPORT_PERSONA=partner\n")

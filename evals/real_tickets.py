@@ -141,12 +141,13 @@ def score(ticket: RealTicket, result: Triage, scenarios: dict[str, Scenario]) ->
     else:
         row.retrieval_right = not any(strong for _, strong in row.retrieved)
     a = result.answer
-    row.mode, row.mode_right = result.mode, result.mode == ticket.mode
+    row.mode = result.mode
+    row.mode_right = result.mode == ticket.mode or (result.mode == "request" and ticket.mode == "clarify")
     row.outcome, row.confidence = a.outcome, a.confidence
     row.possibilities = [p.runbook_number for p in a.possibilities]
     row.attempts, row.code_fallback = result.attempts, result.code_fallback
     row.warnings, row.dropped = len(a.warnings), len(a.dropped_evidence)
-    if result.mode == "clarify":
+    if result.mode in ("clarify", "request"):
         row.cause = "n/a"
     else:
         wanted = {name for name, s in scenarios.items() if s.runbook_number in ticket.runbooks}
@@ -157,13 +158,13 @@ def score(ticket: RealTicket, result: Triage, scenarios: dict[str, Scenario]) ->
 
 
 def run_all(tickets: list[RealTicket], *, backend: Backend, retriever: Retriever, scenarios: dict[str, Scenario],
-            guard: Guard, system_text: str, log_secrets: str = "mask", progress=None) -> list[Row]:
+            guard: Guard, system_text: str, log_secrets: str = "mask", persona: str = "vendor", progress=None) -> list[Row]:
     rows: list[Row] = []
     for ticket in tickets:
         started = time.monotonic()
         try:
             result = run_triage(ticket.text, "", backend=backend, retriever=retriever, scenarios=scenarios,
-                                guard=guard, system_text=system_text, log_secrets=log_secrets)
+                                guard=guard, system_text=system_text, log_secrets=log_secrets, persona=persona)
             row = score(ticket, result, scenarios)
         except (BackendError, SecretFound) as exc:
             row = Row(ticket=ticket, error=str(exc))
@@ -310,7 +311,8 @@ def main(argv: list[str] | None = None) -> int:
         company, systems = load_names(config.lab_dir)
         print(f"Running {len(tickets)} tickets on {args.backend} {args.model}" + (f" at {args.num_ctx}" if args.backend == "ollama" else ""), file=sys.stderr)
         rows = run_all(tickets, backend=backend, retriever=build_retriever(config.lab_dir), scenarios=scenarios, guard=guard,
-                       system_text=load_system(company, systems), log_secrets=config.log_secrets,
+                       system_text=load_system(company, systems, config.support_persona), log_secrets=config.log_secrets,
+                       persona=config.support_persona,
                        progress=lambda r: print(f"  {r.ticket.id}: {r.error or r.mode + ' / ' + r.outcome} ({r.seconds} s)", file=sys.stderr))
     except (TicketFileError, ConfigError, FileNotFoundError) as exc:
         print(f"error: {exc}", file=sys.stderr)

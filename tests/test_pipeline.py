@@ -94,6 +94,8 @@ def test_every_cold_query_that_is_clarify_mode_asserts_nothing(world):
     for row in COLD:
         if decide_mode(world["retriever"].search(row["q"])) == "diagnose":
             continue  # a strong match needs a model (or a recording); this test is about the rest
+        if triage(world, row["q"]).mode == "request":
+            continue  # an account request is answered by code, with no questions (tested separately)
         clarify += 1
         assert_no_cause_asserted(triage(world, row["q"]))
     assert clarify >= 6
@@ -105,10 +107,11 @@ def test_the_reply_to_staff_has_no_commands_or_header_names(world):
     assert chr(0x2014) not in reply
 
 
-def test_user_side_hint_gets_a_question_to_check_it(world):
+def test_a_password_reset_request_is_a_service_request_not_a_diagnosis(world):
     result = triage(world, "I forgot my password and the reset email never arrives")
-    assert_no_cause_asserted(result)
-    assert "forgotten or mistyped password" in result.answer.questions_for_customer[0]
+    assert result.mode == "request" and result.answer.kind == "service_request" and result.answer.source == "offline"
+    assert result.answer.outcome == "not_a_lab_fault" and not result.answer.asserts_cause
+    assert result.answer.questions_for_customer == [] and "account administrator" in result.answer.customer_reply
 
 
 # --- strong matches: a cause may be stated -----------------------------------------------------
@@ -117,7 +120,7 @@ DIAGNOSIS = {"outcome": "redirect-loop", "confidence": "high",
              "likely_cause": "The proxy stopped sending X-Forwarded-Proto to the edge app, so it keeps redirecting to HTTPS.",
              "evidence": [{"line": LOOP_LOG, "why": "scheme=http with no forwarded protocol"}],
              "fix_steps": ["Repeat the forwarded headers in the location, or remove the extra proxy_set_header."],
-             "customer_reply": "We have found the problem and are fixing it.", "questions_for_customer": [], "possibilities": []}
+             "customer_reply": "The most likely cause is a change to the proxy headers. Did anything change on the proxy recently?", "questions_for_customer": [], "possibilities": []}
 
 
 def test_strong_match_runs_in_diagnose_mode_and_may_state_a_cause(world):
@@ -294,7 +297,7 @@ def test_a_self_contradicting_answer_is_sent_back_once_and_the_fixed_one_is_used
     result = triage(world, "The portal goes round in circles", LOOP_LOG, backend)
     assert result.attempts == 2 and result.answer.outcome == "redirect-loop" and result.answer.confidence == "high"
     assert "CONTRADICTION" in backend.prompts[1].user and "runbook 15" in backend.prompts[1].user
-    assert not any("contradicts" in f for f in result.flags)
+    assert not any("not a lab fault" in f for f in result.flags)
 
 
 def test_a_contradiction_that_survives_the_retry_is_kept_but_capped_and_flagged(world):
@@ -302,7 +305,98 @@ def test_a_contradiction_that_survives_the_retry_is_kept_but_capped_and_flagged(
     result = triage(world, "The portal goes round in circles", LOOP_LOG, backend)
     assert result.attempts == 2 and not result.code_fallback
     assert result.answer.outcome == "not_a_lab_fault" and result.answer.confidence == "low"
-    assert any("contradicts itself" in f and "capped at low" in f for f in result.flags)
+    assert any("says not a lab fault" in f and "capped at low" in f for f in result.flags)
     assert result.answer.warnings[0].startswith("The answer contradicts itself")
     from triage.answer import render
-    assert render(result.answer, result.flags).startswith("> WARNING: this answer contradicts itself")
+    assert render(result.answer, result.flags).startswith("> WARNING: this answer says not a lab fault")
+
+
+# --- the post-review rules, end to end ---------------------------------------------------------------
+
+WIFI = ("We replaced our old wireless controller on Monday. Staff can't join the staff SSID, the controller just says the RADIUS "
+        "server timed out. Guest wifi is fine.")
+WIFI_BAD = {**DIAGNOSIS, "outcome": "radius-shared-secret-mismatch", "evidence": [], "confidence": "medium",
+            "likely_cause": "The shared secret on the controller differs from the server's.",
+            "customer_reply": "We will update the shared secret. Please confirm the current shared secret and we will proceed.",
+            "fix_steps": ["Which NAS is failing?", "Run scripts/fix.sh radius-shared-secret-mismatch"]}
+WIFI_GOOD = {**WIFI_BAD, "customer_reply": "The most likely cause is that the shared secret on your controller no longer matches. "
+             "Please check it on both sides. Was the controller reset or restored from a backup?",
+             "fix_steps": ["Compare the shared secret on both sides."]}
+
+
+def test_a_reply_that_asks_for_a_secret_is_sent_back_with_the_reasons_and_the_good_one_is_used(world):
+    backend = Scripted(world["guard"], [WIFI_BAD, WIFI_GOOD])
+    result = triage(world, WIFI, backend=backend)
+    assert result.attempts == 2 and result.answer.warnings == [] and not any("corrected" in f for f in result.flags)
+    fed_back = backend.prompts[1].user
+    for reason in ("asks for a secret", "customer's own", "fix step 1 is a question", "specific to the lab"):
+        assert reason in fed_back, reason
+
+
+def test_if_the_model_breaks_the_reply_rules_twice_code_corrects_it_and_says_so(world):
+    from triage import rules
+    from triage.answer import Context
+
+    result = triage(world, WIFI, backend=Scripted(world["guard"], [WIFI_BAD, WIFI_BAD]))
+    a = result.answer
+    assert result.attempts == 2 and not result.code_fallback
+    assert rules.secret_requests(a.customer_reply) == [] and "We will update" not in a.customer_reply
+    assert "We recommend that you update the shared secret" in a.customer_reply
+    assert a.fix_steps == ["Follow the Fix section of the matching runbook."] and "Which NAS is failing?" in a.questions_for_customer
+    assert a.customer_reply.lower().count("most likely") >= 1 and "?" in a.customer_reply
+    assert any(f.startswith("WARNING: the model broke the reply rules twice") for f in result.flags)
+    assert any(w.startswith("Corrected by code") for w in a.warnings)
+
+
+def test_the_corrected_answer_passes_every_rule(world):
+    from triage import rules
+    from triage.answer import Context
+
+    result = triage(world, WIFI, backend=Scripted(world["guard"], [WIFI_BAD, WIFI_BAD]))
+    ctx = Context(mode="diagnose", logs="", ticket=WIFI, scenario_runbooks={}, retrieved={}, persona="vendor",
+                  customer_side=rules.customer_side(WIFI))
+    assert rules.content_violations(result.answer, ctx) == []
+
+
+def test_an_internal_persona_may_promise_work_on_the_customers_side(world):
+    reply = {**WIFI_GOOD, "customer_reply": "We will update the shared secret on the controller. Was the controller replaced recently?"}
+    # most likely is still required below high confidence, so word it that way; the persona is the point here
+    reply["customer_reply"] = "The most likely cause is the shared secret. We will update it on the controller. Was it replaced recently?"
+    vendor = triage(world, WIFI, backend=Scripted(world["guard"], [reply, reply]))
+    assert "We will update" not in vendor.answer.customer_reply and vendor.attempts == 2
+    internal = run_triage(WIFI, "", backend=Scripted(world["guard"], [reply]), retriever=world["retriever"], scenarios=world["scenarios"],
+                          guard=world["guard"], system_text=world["system_text"], persona="internal")
+    assert internal.attempts == 1 and "We will update it on the controller" in internal.answer.customer_reply
+
+
+def test_an_account_request_is_answered_by_code_and_the_model_is_never_asked(world):
+    backend = Scripted(world["guard"], [])
+    result = triage(world, "I typed my password wrong too many times and now I'm locked out. Can you unlock me please?", backend=backend)
+    assert backend.prompts == [] and result.mode == "request" and result.answer.kind == "service_request"
+    assert "unlock the account" in result.answer.customer_reply and result.answer.questions_for_customer == []
+
+
+def test_a_request_word_does_not_hide_a_real_fault_that_matched_strongly(world):
+    ticket = "Since the proxy change everyone gets 502 Bad Gateway at sign-in, and one person is locked out as well."
+    backend = Scripted(world["guard"], [{**DIAGNOSIS, "outcome": "proxy-bad-gateway", "evidence": [], "confidence": "medium"}])
+    result = triage(world, ticket, backend=backend)
+    assert result.mode == "diagnose" and len(backend.prompts) >= 1
+
+
+CLOCK_ERROR = "Users see: Could not validate timestamp: expired. Check system clock."
+CLOCK_REPLY = {**DIAGNOSIS, "outcome": "clock-skew", "evidence": [], "confidence": "high",
+               "customer_reply": "The cause is a clock difference on the application server. We recommend checking its time."}
+
+
+def test_high_confidence_without_logs_when_the_ticket_quotes_the_documented_error_text(world):
+    result = triage(world, CLOCK_ERROR, backend=Scripted(world["guard"], [CLOCK_REPLY]))
+    assert result.mode == "diagnose" and result.attempts == 1 and result.answer.confidence == "high"
+    assert any("documented error text word for word" in w for w in result.answer.warnings)
+
+
+def test_without_the_documented_text_the_same_reply_is_capped_and_must_be_hedged(world):
+    ticket = "The clock on our application server is wrong and the portal says the response is too old."
+    result = triage(world, ticket, backend=Scripted(world["guard"], [CLOCK_REPLY, CLOCK_REPLY]))
+    assert result.answer.confidence == "medium"
+    assert "the cause is" not in result.answer.customer_reply.lower() and "most likely" in result.answer.customer_reply.lower()
+    assert result.attempts == 2  # "The cause is ..." is not allowed below high confidence

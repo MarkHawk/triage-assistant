@@ -90,7 +90,7 @@ def world():
 
 def diagnosis(outcome, **kw):
     base = {"outcome": outcome, "confidence": "high", "likely_cause": "The proxy dropped the header.", "evidence": [],
-            "fix_steps": ["Restore it."], "customer_reply": "We are on it.", "questions_for_customer": [], "possibilities": []}
+            "fix_steps": ["Restore it."], "customer_reply": "The most likely cause is a change to the proxy headers. Did anything change on the proxy recently?", "questions_for_customer": [], "possibilities": []}
     return {**base, **kw}
 
 
@@ -146,8 +146,9 @@ def test_no_runbook_expected_means_nothing_may_match_strongly(world):
     assert row.retrieval_right and row.mode_right and row.cause == "n/a"
     (wrong,) = run(world, [ticket("l", LOOPS, None)], [diagnosis("redirect-loop")])
     assert not wrong.retrieval_right and wrong.cause == "wrong"
-    (fine,) = run(world, [ticket("n", LOOPS, None, "diagnose")], [diagnosis("not_a_lab_fault", likely_cause="")])
-    assert fine.cause == "right"
+    # The model says "not a lab fault" for a ticket a runbook matched strongly: it is sent back once, then kept at low confidence.
+    (fine,) = run(world, [ticket("n", LOOPS, None, "diagnose")], [diagnosis("not_a_lab_fault", likely_cause="")] * 2)
+    assert fine.cause == "right" and fine.confidence == "low"
 
 
 def test_a_backend_error_is_one_error_row_and_the_run_carries_on(world):

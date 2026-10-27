@@ -88,7 +88,8 @@ def cmd_ticket(args: argparse.Namespace) -> int:
     try:
         result = run_triage(ticket.text, logs, backend=backend, retriever=build_retriever(config.lab_dir),
                             scenarios=load_scenarios(config.lab_dir), guard=guard,
-                            system_text=load_system(company, systems), log_secrets=config.log_secrets)
+                            system_text=load_system(company, systems, config.support_persona), log_secrets=config.log_secrets,
+                            persona=config.support_persona)
     except SecretFound as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 3

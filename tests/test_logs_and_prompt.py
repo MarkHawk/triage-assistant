@@ -67,7 +67,7 @@ def system_text(lab):
 def test_system_prompt_is_filled_in_and_plain(system_text):
     assert "Northgate Supplies" in system_text and "Northgate Staff Portal" in system_text
     assert "{{" not in system_text and chr(0x2014) not in system_text
-    assert tokens(system_text) < 1200
+    assert tokens(system_text) < 1500
 
 
 def matches_of(runbooks, numbers, strong=True):
@@ -168,3 +168,32 @@ def test_the_clarify_prompt_carries_the_worked_example(lab, system_text):
     assert "An example of a compliant reply" in p.user and '"needs_more_info"' in p.user and "{example}" not in p.user
     d = build_prompt(system_text, "diagnose", "t", "", matches_of(runbooks, [15]), (), "", CLAUDE_BUDGET)
     assert "An example of a compliant reply" not in d.user
+
+
+def test_the_system_prompt_states_the_persona_and_the_new_rules(lab):
+    company, systems = load_names(lab)
+    vendor, internal = load_system(company, systems, "vendor"), load_system(company, systems, "internal")
+    assert "vendor of the sign-in service" in vendor and "please check" in vendor and "vendor of the sign-in service" not in internal
+    assert "customer's own IT team" in internal and "{{" not in vendor + internal
+    for text in (vendor, internal):
+        for rule in ("Never ask the customer for a password, shared secret", "most likely cause", "Never write a question as a step",
+                     "Never mention lab scripts", "documented error text word for word"):
+            assert rule in text, rule
+        assert chr(0x2014) not in text
+
+
+def test_the_diagnose_prompt_carries_a_hedged_reply_example_and_it_follows_the_rules(lab, system_text):
+    from triage import rules
+    from triage.answer import Answer
+    from triage.prompt import DIAGNOSE_REPLY_EXAMPLE
+
+    runbooks = load_runbooks(lab)
+    p = build_prompt(system_text, "diagnose", "t", "", matches_of(runbooks, [15]), (), "", CLAUDE_BUDGET)
+    assert DIAGNOSE_REPLY_EXAMPLE in p.user and "{reply_example}" not in p.user
+    example = Answer(mode="diagnose", outcome="proxy-tls-interception", confidence="medium", likely_cause="x", evidence=[], runbook=None,
+                     fix_steps=[], customer_reply=DIAGNOSE_REPLY_EXAMPLE, questions_for_customer=[], possibilities=[])
+    from triage.answer import Context
+
+    ctx = Context(mode="diagnose", logs="", ticket="", scenario_runbooks={}, retrieved={}, persona="vendor",
+                  customer_side=("our server",))
+    assert rules.content_violations(example, ctx) == []

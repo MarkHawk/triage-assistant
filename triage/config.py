@@ -62,6 +62,7 @@ class Config:
     ollama_timeout_s: int
     ollama_keep_alive: str
     log_secrets: str  # "mask" (default) or "refuse"
+    support_persona: str  # "vendor" (default) or "internal"
 
     @property
     def ollama_prompt_budget_tokens(self) -> int:
@@ -97,6 +98,10 @@ def load_config(env_file: Path | None = None, environ: dict[str, str] | None = N
     if log_secrets not in ("mask", "refuse"):
         raise ConfigError(f"LOG_SECRETS must be mask or refuse, got {log_secrets!r}")
 
+    persona = env.get("SUPPORT_PERSONA", "").strip().lower() or "vendor"
+    if persona not in ("vendor", "internal"):
+        raise ConfigError(f"SUPPORT_PERSONA must be vendor or internal, got {persona!r}")
+
     return Config(
         lab_dir=lab.resolve(),
         backend=backend,
@@ -111,4 +116,5 @@ def load_config(env_file: Path | None = None, environ: dict[str, str] | None = N
         ollama_timeout_s=_int(env, "OLLAMA_TIMEOUT_S", 300),
         ollama_keep_alive=env.get("OLLAMA_KEEP_ALIVE", "").strip() or "30m",
         log_secrets=log_secrets,
+        support_persona=persona,
     )

@@ -13,8 +13,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from . import answer as ans
+from . import rules, service_requests
 from .backends.base import Backend, BackendError
-from .clarify import build_clarify_answer
+from .clarify import build_clarify_answer, questions_from
 from .guard import Guard
 from .logs import tidy_logs
 from .prompt import Prompt, build_prompt
@@ -42,7 +43,8 @@ def decide_mode(result: Result) -> str:
 
 
 def run_triage(ticket_text: str, logs_text: str, *, backend: Backend, retriever: Retriever,
-               scenarios: dict[str, Scenario], guard: Guard, system_text: str, log_secrets: str = "mask") -> Triage:
+               scenarios: dict[str, Scenario], guard: Guard, system_text: str, log_secrets: str = "mask",
+               persona: str = "vendor") -> Triage:
     """Secrets in the ticket, and by default in the logs, are masked and flagged. With log_secrets="refuse" a secret
     in the logs raises SecretFound. A lab .env value anywhere raises SecretFound. BackendError if the model
     could not be used."""
@@ -58,48 +60,72 @@ def run_triage(ticket_text: str, logs_text: str, *, backend: Backend, retriever:
 
     result = retriever.search(masked.text, logs_text)
     mode = decide_mode(result)
+    if mode == "clarify":  # nothing matched strongly: an account request is answered by code, with no model
+        request = service_requests.detect(masked.text)
+        if request:
+            answer = service_requests.build_answer(request, persona)
+            ans.add_secrets_advice(answer, masked.flagged)
+            return Triage(answer, "request", result, flags)
     scenario_runbooks = {name: s.runbook for name, s in scenarios.items()}
     retrieved = {m.runbook.number: (m.runbook.path, m.runbook.title, m.strong) for m in result.matches}
+    strong = next((m for m in result.matches if m.strong), None)
+    confirming = next((q for q in questions_from([strong]) if "`" not in q), "") if strong else ""
     # A quote may come from the logs as the model saw them (tidied) or as supplied.
     ctx = ans.Context(mode=mode, logs=logs_text + "\n" + tidy_logs(logs_text), ticket=masked.text, scenario_runbooks=scenario_runbooks,
-                      retrieved=retrieved, user_side_hint=bool(result.hints), ticket_was_flagged=masked.flagged)
+                      retrieved=retrieved, user_side_hint=bool(result.hints), ticket_was_flagged=masked.flagged,
+                      persona=persona, customer_side=rules.customer_side(masked.text),
+                      documented=retriever.documented, confirming=confirming)
 
     prompt = build_prompt(system_text, mode, masked.text, logs_text, list(result.matches), result.hints,
                           masked.model_note, backend.budget)
     if mode == "clarify" and backend.offline and not backend.can_replay(prompt):
-        offline = build_clarify_answer(list(result.matches), result.hints)
-        ans.add_secrets_advice(offline, masked.flagged)
-        return Triage(offline, mode, result, flags)
+        return Triage(_code_built(result, masked.flagged, ctx), mode, result, flags)
     schema = ans.output_schema(list(scenario_runbooks))
     flags += prompt.notes
 
     feedback = ""
+    answer, violations, raw, attempts = None, [], None, 0
     for attempt in range(MAX_ATTEMPTS):
         asked = prompt if not feedback else _with_feedback(prompt, feedback)
         raw = backend.complete(asked, schema)
         attempts = attempt + 1
         try:
             answer, violations = ans.check(raw, ctx)
+            violations = violations + rules.content_violations(answer, ctx)
         except ans.AnswerError as exc:
             violations, answer = [f"the reply was unusable: {exc}"], None
         if not violations:
             return Triage(answer, mode, result, flags, prompt, raw, attempts, False, dict(backend.last_stats))
         feedback = "Your previous reply broke these rules, so it was discarded: " + "; ".join(violations) + ". Reply again."
-    if (mode == "diagnose" and answer is not None
-            and all(v.startswith(ans.CONTRADICTION) for v in violations)):  # retried once; keep it, but say so
-        answer.confidence = "low"
-        answer.warnings.insert(0, "The answer contradicts itself and the model did not resolve it when asked: "
-                                  + violations[0].removeprefix(ans.CONTRADICTION).strip())
-        flags.append("WARNING: this answer contradicts itself (the outcome says not a lab fault, but it gives a cause and "
-                     "evidence for a runbook that matched strongly). Confidence was capped at low. Read it with care.")
+
+    # Out of attempts. Rule breaks that code can put right are put right; anything else is not kept.
+    fixable = (*rules.REPAIRABLE, ans.CONTRADICTION)
+    unfixable = [v for v in violations if not v.startswith(fixable)]
+    if answer is not None and not unfixable:
+        if any(v.startswith(ans.CONTRADICTION) for v in violations):
+            answer.confidence = "low"
+            answer.warnings.insert(0, "The answer contradicts itself and the model did not resolve it when asked: "
+                                      + next(v for v in violations if v.startswith(ans.CONTRADICTION)).removeprefix(ans.CONTRADICTION).strip())
+            flags.append("WARNING: this answer says not a lab fault although a runbook matched strongly and nothing points "
+                         "to the user's side. Confidence was capped at low. Read it with care.")
+        changes = rules.repair(answer, ctx)
+        if changes:
+            flags.append("WARNING: the model broke the reply rules twice, so code corrected the answer (" + "; ".join(changes)
+                         + "). Read it before sending.")
         return Triage(answer, mode, result, flags, prompt, raw, attempts, False, dict(backend.last_stats))
-    if mode == "clarify":  # the model keeps asserting; code builds a safe answer instead
-        fallback = build_clarify_answer(list(result.matches), result.hints)
-        ans.add_secrets_advice(fallback, masked.flagged)
+    if mode == "clarify":  # the model keeps breaking the clarify rules; code builds a safe answer instead
+        fallback = _code_built(result, masked.flagged, ctx)
         fallback.warnings.insert(0, "The model's answer broke the clarify rules twice, so this one was built by code: "
                                     + "; ".join(violations))
         return Triage(fallback, mode, result, flags, prompt, None, attempts, True, dict(backend.last_stats))
     raise BackendError("The model's answer could not be used: " + "; ".join(violations))
+
+
+def _code_built(result: Result, ticket_was_flagged: bool, ctx: ans.Context) -> ans.Answer:
+    built = build_clarify_answer(list(result.matches), result.hints)
+    ans.add_secrets_advice(built, ticket_was_flagged)
+    rules.repair(built, ctx)  # the runbooks' own questions can carry lab wording
+    return built
 
 
 def _with_feedback(prompt: Prompt, feedback: str) -> Prompt:
