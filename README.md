@@ -56,7 +56,8 @@ Latest score for each evaluation, backend and model. Window 12288 throughout.
 | Lab scenarios: 7 cases broken in the lab, scoped logs, 3 runs each | Ollama `qwen2.5:14b` | 2026-10-26 | scenario right 21/21 |
 | Lab scenarios: the same | Ollama `qwen2.5-coder:14b` | 2026-10-26 | scenario right 12/21 |
 | Retrieval cold set: 24 queries, no model | none | 2026-10-26 | 23/24 |
-| Any of the above | Claude | | not run |
+
+The Claude backend is supported but hasn't been scored yet.
 
 **The rules are enforced in code, not trusted to the model.** On the real-ticket set (run D) the model needed a second attempt on 10 of 19 answers, and code corrected 7 of them; every one is flagged to the engineer above the answer.
 
