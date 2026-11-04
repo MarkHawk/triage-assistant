@@ -1,0 +1,31 @@
+{
+  "meta": {
+    "recorded": "2026-11-04",
+    "backend": "ollama",
+    "model": "qwen2.5:14b"
+  },
+  "answer": {
+    "outcome": "radius-challenge-unsupported",
+    "confidence": "high",
+    "likely_cause": "The RADIUS server now asks MFA users for a one-time code after their password, using an Access-Challenge, but this NAS can't show that second prompt, so it treats the request for a code as a rejection and the user is never asked.",
+    "evidence": [
+      {
+        "line": "nas-1 | 2026-11-03T21:52:12Z nas: Access-Challenge from radius:1812 for heidi discarded: challenge-response not enabled (treated as Access-Reject)",
+        "why": "The NAS discards the Access-Challenge because it does not support challenge-response."
+      },
+      {
+        "line": "radius-1 | 2026-11-03T21:52:12.594231072Z Tue Nov  3 21:52:12 2026 : Auth: Challenge sent: [heidi] (from client nas port 0)",
+        "why": "The RADIUS server sent an Access-Challenge to the NAS."
+      }
+    ],
+    "fix_steps": [
+      "Check if the NAS supports RADIUS challenge-response and enable it if possible.",
+      "If the NAS does not support challenge-response, consider appending the code to the password for that NAS only."
+    ],
+    "customer_reply": "Thank you for the details. The most likely cause is that the RADIUS server is now asking for a one-time code after the password, but your NAS does not support this challenge-response feature. As a result, the login attempt is rejected without asking for the code. We recommend checking if your NAS supports RADIUS challenge-response and enabling it if possible. If it does not support it, you may need to append the code to the password for that NAS only. Please confirm if the NAS supports RADIUS challenge-response and let us know the model and firmware version.",
+    "questions_for_customer": [
+      "Does the NAS support RADIUS challenge-response? What is the model and firmware version of the NAS?"
+    ],
+    "possibilities": []
+  }
+}

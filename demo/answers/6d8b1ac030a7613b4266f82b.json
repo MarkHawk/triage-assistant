@@ -1,0 +1,21 @@
+{
+  "meta": {
+    "recorded": "2026-11-04",
+    "backend": "ollama",
+    "model": "qwen2.5-coder:14b"
+  },
+  "answer": {
+    "outcome": "needs_more_info",
+    "confidence": "low",
+    "likely_cause": "",
+    "evidence": [],
+    "fix_steps": [],
+    "customer_reply": "Thank you for letting us know. To work out what is going wrong we need a little more detail. Could you tell us what you see on the screen when it fails, whether it happens for everyone or only for you, and how long it takes before the error appears?",
+    "questions_for_customer": [
+      "What exactly do you see when it fails? Please copy any error message.",
+      "Does it happen for everyone, or only for some people?",
+      "How long after you press Log in does the error appear?"
+    ],
+    "possibilities": []
+  }
+}
