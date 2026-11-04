@@ -149,7 +149,6 @@ These came from reviewing the real-ticket set. [docs/post-review-changes.md](doc
 - **A bare one-time code is not caught by the guard.** A six to eight digit code next to an MFA word (`otp=`, `TOTP-Password:`, `authenticator code:`, `TOTP 123456`) is masked in tickets and refused in logs. "My code is 123456" is not, because digits alone are too common to match safely. Codes expire within about 30 seconds, so a stray one is low risk, but the guard does not stop it.
 - **MFA service requests still get weak matches.** "I got a new phone and need to move my authenticator" and "the code arrives by text message late" retrieve weak MFA runbooks instead of nothing. They are labelled weak, so the answer asks questions and asserts nothing, but the retriever has no phrase for them.
 - **Clarify never asks runbook 20's "how many times have you tried?".** Code-built clarify answers take the first four questions of the top runbook, and that question is sixth. The other MFA questions do come through. I did not hard-code it.
-- **The MFA demo has fixtures but no recorded answer yet.** `demo/fixtures/radius-challenge-unsupported/` needs `python -m triage ticket demo/fixtures/radius-challenge-unsupported/ticket.md --logs demo/fixtures/radius-challenge-unsupported/logs.txt --backend ollama --record` on a machine with the model. Until then the 60-second demo does not show it.
 
 ## Retrieval
 
