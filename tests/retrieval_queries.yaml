@@ -83,3 +83,4 @@
 - {id: md08, split: mfa-dev, runbook: 23, text: "The VPN rejects me and never asks for a code."}
 - {id: md09, split: mfa-dev, runbook: 23, text: "Wifi login fails since MFA went on. It works on the website but not on the VPN."}
 - {id: md10, split: mfa-dev, runbook: null, text: "Can you turn on MFA for the finance team please?"}
+- {id: md11, split: mfa-dev, runbook: null, text: "I lost my phone with the authenticator on it. Can someone reset my MFA?"}
