@@ -161,7 +161,7 @@ class Retriever:
         self._expect = {s.name: s.expect.lower() for s in self.scenarios.values() if s.expect}
         self._patterns = {}
         for s in self.scenarios.values():
-            if s.log_pattern:
+            if s.log_pattern and not s.log_absent:  # a silent-log pattern must NOT appear, so it is no evidence
                 try:
                     self._patterns[s.name] = re.compile(s.log_pattern)
                 except re.error:

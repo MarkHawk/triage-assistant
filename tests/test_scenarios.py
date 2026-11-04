@@ -49,6 +49,17 @@ def test_every_real_scenario_parses_and_has_a_runbook():
         assert Path(lab, s.runbook).is_file(), s.name
 
 
+def test_silent_log_is_a_first_class_state(tmp_path):
+    f = tmp_path / "quiet.sh"
+    f.write_text(SAMPLE.replace("SCENARIO_LOG=", "SCENARIO_LOG_ABSENT="))
+    s = parse_scenario(f)
+    assert s.log_absent and s.log_service == "oidc-rp-egress"
+    assert s.log_evidence.startswith("silence in oidc-rp-egress: no line matching")
+    f.write_text(SAMPLE)
+    loud = parse_scenario(f)
+    assert not loud.log_absent and loud.log_evidence.startswith("a line in oidc-rp-egress matching")
+
+
 def test_every_real_scenario_has_a_service_and_a_pattern_that_compiles():
     import re
 
@@ -56,5 +67,6 @@ def test_every_real_scenario_has_a_service_and_a_pattern_that_compiles():
     if not (lab / "scenarios").is_dir():
         pytest.skip("identity-lab not found at LAB_DIR")
     for s in load_scenarios(lab).values():
+        # a scenario proves itself by a log line, or by the absence of one
         assert s.log_service and s.log_pattern, s.name
         re.compile(s.log_pattern)

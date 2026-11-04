@@ -25,6 +25,17 @@ class Scenario:
     log_service: str  # compose service whose log shows it ("" if none)
     log_pattern: str  # extended regex for the line that proves it, without the service ("" if none)
     unaffected: str  # "<app> <user>" still working while broken ("" if none)
+    log_absent: bool = False  # True when the proof is silence: no line matching log_pattern in log_service
+
+    @property
+    def log_evidence(self) -> str:
+        """One line saying how the lab proves this scenario from logs."""
+        if not self.log_pattern:
+            return "no log evidence"
+        where = f" in {self.log_service}" if self.log_service else ""
+        if self.log_absent:
+            return f"silence{where}: no line matching {self.log_pattern}"
+        return f"a line{where} matching {self.log_pattern}"
 
     @property
     def runbook_number(self) -> int:
@@ -55,7 +66,8 @@ def parse_scenario(path: Path) -> Scenario:
     missing = [k for k in ("SCENARIO_SUMMARY", "SCENARIO_RUNBOOK", "SCENARIO_APP", "SCENARIO_EXPECT") if not found.get(k)]
     if missing:
         raise ValueError(f"{path.name}: missing {', '.join(missing)}")
-    service, pattern = split_log(found.get("SCENARIO_LOG", ""))
+    absent = bool(found.get("SCENARIO_LOG_ABSENT")) and not found.get("SCENARIO_LOG")
+    service, pattern = split_log(found.get("SCENARIO_LOG") or found.get("SCENARIO_LOG_ABSENT", ""))
     return Scenario(
         name=path.stem,
         summary=found["SCENARIO_SUMMARY"],
@@ -65,6 +77,7 @@ def parse_scenario(path: Path) -> Scenario:
         log_service=service,
         log_pattern=pattern,
         unaffected=found.get("SCENARIO_UNAFFECTED", ""),
+        log_absent=absent,
     )
 
 

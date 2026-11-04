@@ -95,6 +95,8 @@ def test_scenario_log_patterns_hit_their_runbook(retriever):
     lab = lab_dir()
     checked, wrong = 0, []
     for scenario in retriever.scenarios.values():
+        if scenario.log_absent:
+            continue  # proven by silence: there is no log line to sample
         pattern = re.compile(scenario.log_pattern)
         sample = next((l for l in (lab / scenario.runbook).read_text().splitlines() if pattern.search(l)), None)
         if sample is None:
