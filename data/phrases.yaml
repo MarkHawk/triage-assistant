@@ -147,6 +147,11 @@
 - say: [reset my mfa, reset my authenticator, lost my phone, lost my authenticator, replaced my phone, turn on mfa, enable mfa, switch on mfa, set up mfa for]
   hint: service request such as an MFA reset or enrolment, not a fault
 
+# Office equipment is not an MFA fault. "offline" is in runbook 20 (a phone kept offline) and must not pull it in.
+# A negative weight only pushes the runbooks down; it is not evidence for anything.
+- say: [printer, scanner, toner, photocopier, projector, monitor, keyboard, headset, desk phone, shared drive, mapped drive]
+  runbooks: {20: -1.0, 21: -1.0, 22: -1.0, 23: -1.0}
+
 # User-side causes: not a lab fault.
 - say: [forgot my password, forgotten my password, forgot password, reset my password, password reset, caps lock, wrong password, mistyped, typed it wrong, locked out after, too many attempts]
   hint: user-side cause such as a forgotten or mistyped password

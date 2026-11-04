@@ -195,18 +195,6 @@ class Retriever:
         reasons: dict[int, list[str]] = {n: [] for n in self.runbooks}
         score: dict[int, float] = {n: 0.0 for n in self.runbooks}
 
-        raw = self._bm25(terms(ticket))
-        if max(raw.values(), default=0.0) >= RAW_BM25_FLOOR:
-            for number, value in self._normalise(raw).items():
-                score[number] += value
-                if value >= 0.5:
-                    reasons[number].append(_WORDING)
-        if logs.strip():
-            raw_logs = self._bm25(terms(logs))
-            if max(raw_logs.values(), default=0.0) >= RAW_BM25_FLOOR:
-                for number, value in self._normalise(raw_logs).items():
-                    score[number] += LOG_WEIGHT * value
-
         # People's own words, from data/phrases.yaml.
         phrase_total: dict[int, float] = {}
         hints: list[str] = []
@@ -219,7 +207,23 @@ class Retriever:
             for number, weight in entry.weights.items():
                 if number in self.runbooks:
                     phrase_total[number] = phrase_total.get(number, 0.0) + weight
-                    reasons[number].append("matches how customers describe it")
+                    if weight > 0:  # a negative weight only pushes a runbook down; it is not evidence for it
+                        reasons[number].append("matches how customers describe it")
+        # A runbook the phrases push down (negative total) is left out of the keyword ranking altogether,
+        # so it cannot become the reference the other runbooks' scores are measured against.
+        blocked = {n for n, t in phrase_total.items() if t < 0}
+        raw = {n: (0.0 if n in blocked else v) for n, v in self._bm25(terms(ticket)).items()}
+        if max(raw.values(), default=0.0) >= RAW_BM25_FLOOR:
+            for number, value in self._normalise(raw).items():
+                score[number] += value
+                if value >= 0.5:
+                    reasons[number].append(_WORDING)
+        if logs.strip():
+            raw_logs = self._bm25(terms(logs))
+            if max(raw_logs.values(), default=0.0) >= RAW_BM25_FLOOR:
+                for number, value in self._normalise(raw_logs).items():
+                    score[number] += LOG_WEIGHT * value
+
         for number, total in phrase_total.items():
             score[number] += min(total, PHRASE_CAP)
 
