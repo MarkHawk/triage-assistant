@@ -69,3 +69,13 @@ def test_recordings_say_which_model_made_them():
     for path in files:
         meta = json.loads(path.read_text())["meta"]
         assert set(meta) == {"recorded", "backend", "model"} and meta["backend"] in ("claude", "ollama") and meta["model"]
+
+
+def test_radius_challenge_fixture_is_clean_and_finds_runbook_23(world):
+    """The MFA demo fixture: real lab log lines, no secret or code in either file. Its model answer is recorded separately."""
+    folder = FIXTURES / "radius-challenge-unsupported"
+    ticket, logs = load_ticket(folder / "ticket.md"), (folder / "logs.txt").read_text()
+    assert not world["guard"].scan(ticket.text) and not world["guard"].scan(logs)
+    assert "Challenge sent" in logs and "discarded" in logs
+    result = world["retriever"].search(ticket.text, logs)
+    assert result.matches[0].runbook.number == 23 and result.matches[0].strong

@@ -1,0 +1,5 @@
+radius-1  | 2026-11-03T21:52:12.594231072Z Tue Nov  3 21:52:12 2026 : Auth: Challenge sent: [heidi] (from client nas port 0)
+nas-1     | 2026-11-03T21:52:12.611895380Z 2026-11-03T21:52:12Z nas: Access-Challenge from radius:1812 for heidi discarded: challenge-response not enabled (treated as Access-Reject)
+radius-1  | 2026-11-03T21:52:12.991151531Z Tue Nov  3 21:52:12 2026 : Auth: (137) Login OK: [dave] (from client nas port 0)
+radius-1  | 2026-11-03T21:52:30.664610458Z Tue Nov  3 21:52:30 2026 : Auth: Challenge sent: [heidi] (from client nas port 0)
+nas-1     | 2026-11-03T21:52:30.682697548Z 2026-11-03T21:52:30Z nas: Access-Challenge from radius:1812 for heidi discarded: challenge-response not enabled (treated as Access-Reject)
