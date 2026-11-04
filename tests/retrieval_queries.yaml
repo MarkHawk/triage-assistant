@@ -58,3 +58,16 @@
 - {id: f12, split: fresh, runbook: 19, text: "Our dashboard shows a network error when loading data, but the endpoint answers when I test it directly with a script."}
 - {id: f13, split: fresh, runbook: 7, text: "After I enter my password the screen hangs for a bit and shows 504, but trying again a minute later works."}
 - {id: f14, split: fresh, runbook: 2, text: "Logins to the portal worked this morning but now say the assertion is too old although we only just clicked."}
+
+# mfa-held-out: written after the lab's MFA runbooks (20 to 23) arrived and before any change to data/phrases.yaml.
+# The first run is recorded in the README. mfa-dev (below it, added afterwards) is what the tuning used.
+- {id: hm01, split: mfa-held-out, runbook: 20, text: "The six digit number my authenticator app shows gets refused every time I sign in, although my password is fine."}
+- {id: hm02, split: mfa-held-out, runbook: 20, text: "Ever since I came back from my trip the code on my phone gets refused at sign in."}
+- {id: hm03, split: mfa-held-out, runbook: 21, text: "Our new starter reached the screen that sets up the authenticator app, typed the number it showed and was told it was invalid."}
+- {id: hm04, split: mfa-held-out, runbook: 21, text: "Since IT changed the security settings on Tuesday nobody joining this month can finish setting up the phone app for sign in, but the rest of us are fine."}
+- {id: hm05, split: mfa-held-out, runbook: 22, text: "I tried the codes from my app several times and now it will not let me in at all, even with the right password."}
+- {id: hm06, split: mfa-held-out, runbook: 22, text: "I fumbled the code four or five times and now I am shut out. A colleague says to wait ten minutes and try again."}
+- {id: hm07, split: mfa-held-out, runbook: 23, text: "I can sign in to the portal with my phone code but the Wi-Fi turns me away."}
+- {id: hm08, split: mfa-held-out, runbook: 23, text: "The remote access client rejects me straight away without asking for any number, since we turned on two-step sign in."}
+- {id: hm09, split: mfa-held-out, runbook: null, text: "I got a new phone and need to move my authenticator over to it."}
+- {id: hm10, split: mfa-held-out, runbook: null, text: "The code arrives by text message late, so by the time I type it in it has gone."}
