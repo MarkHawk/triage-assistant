@@ -123,6 +123,30 @@
   near: [[postman, browser], [curl, browser], [console, blocked]]
   runbooks: {19: 3.0}
 
+# 20 TOTP clock drift (against 02: SAML clock skew says "response", "assertion" or "portal"; this says "code", "phone" or "app")
+- say: [codes stopped working, code stopped working, codes have stopped working, code is always wrong, codes are always wrong, code is always rejected, codes keep being rejected, works on my colleague's phone, works on my colleagues phone, colleague's code works, sometimes works and sometimes doesn't, code sometimes works]
+  near: [[code, colleague, phone], [code, sometimes, work], [codes, sometimes, work], [authenticator, clock], [authenticator, time, wrong], [phone, clock, code], [phone, time, code]]
+  runbooks: {20: 3.0}
+
+# 21 OTP policy changed (new enrolments fail, existing people are fine)
+- say: [set up mfa, setup mfa, set up the authenticator, set up the authenticator app, setup page rejects, setup page says, rejects the code, qr code doesn't work, new joiners can't, new starters can't, only new joiners, only new starters, existing staff are fine, everyone else is fine, started this week, hired since]
+  near: [[new, joiner, mfa], [new, starter, mfa], [setup, reject, code], [setup, code, invalid], [register, authenticator, reject], [enrol, authenticator], [enrol, code, reject], [existing, staff, fine]]
+  runbooks: {21: 3.0}
+
+# 22 MFA lockout (against plain wrong passwords: needs the codes, or the "wrong but it isn't" wording)
+- say: [locked out after trying codes, locked out after wrong codes, locked out after a few codes, tried a few codes, tried several codes, tried lots of codes, too many wrong codes, password is wrong but it isn't, password is wrong but it isnt, says my password is wrong but, works again after a while, worked again after lunch, works again after a wait, works again later]
+  near: [[codes, tried, locked], [codes, tried, password, wrong], [wrong, codes, locked]]
+  runbooks: {22: 3.0}
+
+# 23 RADIUS cannot ask for a code (against 05: shared secret; here the NAS never prompts for a code)
+- say: [never asks for a code, never asks me for a code, never asked for a code, doesn't ask for a code, doesn't ask me for a code, never get asked for a code, without asking for a code, works on the website but not the vpn, works on the website but not on the vpn, works on the website but not wifi, mfa went on, mfa went live, since mfa, since we turned on mfa]
+  near: [[vpn, code, never], [vpn, mfa], [wifi, mfa], [wi, fi, mfa], [vpn, website, not], [wifi, website, not], [vpn, rejects, code]]
+  runbooks: {23: 3.0, 5: -0.5}
+
+# MFA requests that are not faults.
+- say: [reset my mfa, reset my authenticator, lost my phone, lost my authenticator, replaced my phone, turn on mfa, enable mfa, switch on mfa, set up mfa for]
+  hint: service request such as an MFA reset or enrolment, not a fault
+
 # User-side causes: not a lab fault.
 - say: [forgot my password, forgotten my password, forgot password, reset my password, password reset, caps lock, wrong password, mistyped, typed it wrong, locked out after, too many attempts]
   hint: user-side cause such as a forgotten or mistyped password
