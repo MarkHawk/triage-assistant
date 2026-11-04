@@ -45,6 +45,12 @@ runbooks/15-redirect-loop.md
 Sign-in service support
 ```
 
+A second example, from the lab's MFA scenario: users with MFA are turned away by a NAS that cannot show the code prompt, and the answer quotes the server's "Challenge sent" line and the NAS's "discarded" line.
+
+```bash
+BACKEND=demo python -m triage ticket demo/fixtures/radius-challenge-unsupported/ticket.md --logs demo/fixtures/radius-challenge-unsupported/logs.txt
+```
+
 ## Scores
 
 <!-- scores:start -->
