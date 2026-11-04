@@ -25,7 +25,20 @@ SECRET_SAMPLES = {
     "login-value": "GET /auth/callback?code=abcd1234efgh&state=xyz987654321 HTTP/1.1",
     "saml-message": "SAMLResponse here: PHNhbWxwOlJlc3BvbnNl" + "A" * 300,
     "secret-value": 'password: Hunter2Hunter2 and "client_secret": "abc12345"',
+    "otp-code": "I typed otp=" + "492" + "817 and it said no",
 }
+
+OTP_SHAPES = [
+    "otp=" + "492817", "OTP: " + "492817", "TOTP-Password: " + "492817", "TOTP-Password = " + "49281735",
+    "OTP code " + "492817", "authenticator code: " + "492817", "TOTP " + "492817", "mfa_code=" + "492817",
+    "2FA " + "492817", "verification code " + "492817", "one-time code: " + "492817", 'otp="' + '492817' + '"',
+]
+
+OTP_NEAR_MISSES = [
+    "ticket 492817", "INC" + "492817", "port 636", "ldaps on port 636 with otp enabled", "I got a 6 digit code",
+    "the code arrives late", "my code is " + "492817",  # bare code: a documented limitation
+    "TOTP " + "4928171234", "otp " + "49281", "hotpot " + "492817", "otp [MASKED:otp-code]",
+]
 
 
 @pytest.fixture
@@ -123,3 +136,23 @@ def test_lab_env_value_in_logs_is_refused_when_masking(guard):
     with pytest.raises(SecretFound) as err:
         guard.mask_logs(f"INFO x {LAB_SECRET}")
     assert LAB_SECRET not in str(err.value) and "log lines" in str(err.value)
+
+
+@pytest.mark.parametrize("text", OTP_SHAPES)
+def test_otp_codes_next_to_an_mfa_word_are_masked_in_tickets_and_refused_in_logs(guard, text):
+    ticket = guard.mask_ticket("It fails. " + text + " Please help.")
+    assert "otp-code" in {f.kind for f in ticket.findings}
+    assert "492817" not in ticket.text and "49281735" not in ticket.text
+    with pytest.raises(SecretFound) as err:
+        guard.check_log(text)
+    assert "otp-code" in str(err.value) and "4928" not in str(err.value)
+
+
+@pytest.mark.parametrize("text", OTP_NEAR_MISSES)
+def test_near_misses_are_not_otp_codes(guard, text):
+    assert "otp-code" not in {f.kind for f in guard.scan(text)}
+
+
+def test_masking_keeps_the_field_name_so_the_ticket_still_reads():
+    ticket = Guard().mask_ticket("TOTP-Password: " + "492817")
+    assert ticket.text == "TOTP-Password: [MASKED:otp-code]"

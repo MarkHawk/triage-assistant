@@ -44,6 +44,12 @@ _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("secret-value", re.compile(
         r"(?i)(?<![\w-])(?:password|passwd|pwd|client_secret|secret|api[_-]?key|access_token|id_token|refresh_token|token)"
         r"[\"']?[ \t]*[=:][ \t]*[\"']?(?P<secret>" + _NOT_MASKED + r"[^\s&;,\"'<>]{4,})")),
+    # A one-time code next to an MFA word: "otp=123456", "TOTP-Password: 123456", "authenticator code: 123456",
+    # "TOTP 123456". Codes last about 30 seconds, but a pasted one still must not reach a model or a draft reply.
+    ("otp-code", re.compile(
+        r"(?i)(?<![A-Za-z])(?:one[-_ ]time[-_ ]?(?:code|password|passcode|pin)|(?:t?otp|mfa|2fa|authenticator|verification)"
+        r"(?:[-_ ]?(?:code|password|passcode|pin|token))?)[ \t]*[=:]?[ \t]*[\"']?"
+        r"(?P<secret>" + _NOT_MASKED + r"\d{6,8})(?!\d)")),
 ]
 
 _LAB_KEY = re.compile(r"PASSWORD|SECRET|TOKEN|KEY")
