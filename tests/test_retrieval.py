@@ -182,5 +182,4 @@ def test_the_mfa_runbooks_own_questions_reach_clarify(retriever):
     assert "asked for a code" in asked(23) and "first time" in asked(21)
     assert "start working again" in asked(22) and "how many times" in asked(22)
     assert "asked for a code" in asked(23, rank=1)  # still there as a second match
-    # known gap: runbook 20 puts "how many times have you tried" at question 6, past the four a top match gets
-    assert "how many times" not in asked(20)
+    assert "how many times" in asked(20)  # runbook 20 now lists it within the four a top match gets
