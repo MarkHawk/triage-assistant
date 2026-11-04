@@ -168,3 +168,19 @@ def test_mfa_wording_beats_its_look_alikes_in_first_place(retriever):
     assert first("Locked out after trying codes, but it works again after a while.") == 22  # not a plain wrong password
     assert first("Everyone's password is rejected by the VPN, the shared secret was changed") == 5
 
+
+
+def test_the_mfa_runbooks_own_questions_reach_clarify(retriever):
+    """Clarify takes its questions from the runbooks; nothing about MFA is hard-coded."""
+    from triage.clarify import questions_from
+    from triage.retrieval import Match
+
+    def asked(number, rank=0):
+        return " ".join(questions_from([Match(retriever.runbooks[number], 1.0, ())] if rank == 0 else
+                                        [Match(retriever.runbooks[5], 1.0, ()), Match(retriever.runbooks[number], 1.0, ())])).lower()
+
+    assert "asked for a code" in asked(23) and "first time" in asked(21)
+    assert "start working again" in asked(22) and "how many times" in asked(22)
+    assert "asked for a code" in asked(23, rank=1)  # still there as a second match
+    # known gap: runbook 20 puts "how many times have you tried" at question 6, past the four a top match gets
+    assert "how many times" not in asked(20)
