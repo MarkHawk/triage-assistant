@@ -71,3 +71,15 @@
 - {id: hm08, split: mfa-held-out, runbook: 23, text: "The remote access client rejects me straight away without asking for any number, since we turned on two-step sign in."}
 - {id: hm09, split: mfa-held-out, runbook: null, text: "I got a new phone and need to move my authenticator over to it."}
 - {id: hm10, split: mfa-held-out, runbook: null, text: "The code arrives by text message late, so by the time I type it in it has gone."}
+
+# mfa-dev: added after the mfa-held-out first run was recorded; data/phrases.yaml was tuned against these only.
+- {id: md01, split: mfa-dev, runbook: 20, text: "My authenticator codes stopped working this week."}
+- {id: md02, split: mfa-dev, runbook: 20, text: "The code is always wrong. It works on my colleague's phone but not mine."}
+- {id: md03, split: mfa-dev, runbook: 20, text: "The code from my app sometimes works and sometimes doesn't."}
+- {id: md04, split: mfa-dev, runbook: 21, text: "New joiners can't set up MFA. The setup page rejects the code. Existing staff are fine."}
+- {id: md05, split: mfa-dev, runbook: 21, text: "The page for registering the authenticator rejects the code for everybody we hired since the security change."}
+- {id: md06, split: mfa-dev, runbook: 22, text: "It says my password is wrong but it isn't. I had tried a few codes before that."}
+- {id: md07, split: mfa-dev, runbook: 22, text: "Locked out after trying codes, but it works again after a while."}
+- {id: md08, split: mfa-dev, runbook: 23, text: "The VPN rejects me and never asks for a code."}
+- {id: md09, split: mfa-dev, runbook: 23, text: "Wifi login fails since MFA went on. It works on the website but not on the VPN."}
+- {id: md10, split: mfa-dev, runbook: null, text: "Can you turn on MFA for the finance team please?"}
