@@ -140,6 +140,10 @@ These came from reviewing the real-ticket set. [docs/post-review-changes.md](doc
 - **The model sometimes presents runbook text as evidence.** Such quotes are dropped, labelled "quoted the runbook's own example, not the ticket or logs", and never count towards confidence. In run D it happened four times.
 - **Vague whole-organisation outages are genuinely ambiguous.** "Everybody got kicked out at about nine this morning and nobody touched anything" fits runbooks 01 (expired signing certificate), 02 (clock skew), 04 (directory bind) and 17 (maintenance left on) equally well, because none of them has an error text to tell them apart. Retrieval gets this wrong in the one cold-set miss: it returns only runbook 08 (rate limit), as a **weak** match. That is why a weak-only result never gets a stated cause: the assistant asks questions instead. The miss is recorded, not fixed.
 - **Unrelated tickets can still get weak matches.** A laptop, printer or finance-group request returns weak keyword matches rather than nothing. They are labelled weak, and the answer then asserts nothing.
+- **A bare one-time code is not caught by the guard.** A six to eight digit code next to an MFA word (`otp=`, `TOTP-Password:`, `authenticator code:`, `TOTP 123456`) is masked in tickets and refused in logs. "My code is 123456" is not, because digits alone are too common to match safely. Codes expire within about 30 seconds, so a stray one is low risk, but the guard does not stop it.
+- **MFA service requests still get weak matches.** "I got a new phone and need to move my authenticator" and "the code arrives by text message late" retrieve weak MFA runbooks instead of nothing. They are labelled weak, so the answer asks questions and asserts nothing, but the retriever has no phrase for them.
+- **Clarify never asks runbook 20's "how many times have you tried?".** Code-built clarify answers take the first four questions of the top runbook, and that question is sixth. The other MFA questions do come through. I did not hard-code it.
+- **The MFA demo has fixtures but no recorded answer yet.** `demo/fixtures/radius-challenge-unsupported/` needs `python -m triage ticket demo/fixtures/radius-challenge-unsupported/ticket.md --logs demo/fixtures/radius-challenge-unsupported/logs.txt --backend ollama --record` on a machine with the model. Until then the 60-second demo does not show it.
 
 ## Retrieval
 
@@ -155,15 +159,19 @@ A match is **strong** if it has any evidence beyond keywords, and **weak** other
 
 ### How well it works
 
-`tests/retrieval_queries.yaml` has 53 plain-language queries (including unrelated and user-side tickets that should match nothing). Counting a query as right if the expected runbook is in the top three, or nothing is returned when nothing fits:
+`tests/retrieval_queries.yaml` has 74 plain-language queries (including unrelated and user-side tickets that should match nothing). Counting a query as right if the expected runbook is in the top three, or nothing is returned when nothing fits:
 
 | Set | Queries | Plain keyword ranking | Phrases and evidence, first run | Now |
 |---|---|---|---|---|
 | dev (tuned on) | 20 | 17 | 20 | 20 |
 | held-out | 19 | 12 | 17 | 19 |
 | fresh | 14 | not run | 10 | 13 |
+| MFA dev (runbooks 20 to 23, tuned on) | 11 | not run | 3 of the first 10 | 11 |
+| MFA held-out | 10 | not run | 6 | 7 |
 
-Be careful reading the last column. After the first run I fixed what the failures showed (a keyword floor, a word-coverage check, a better stemmer and a few phrases), so the held-out and fresh sets are no longer independent evidence; the "first run" column is the fair one. `tests/test_retrieval.py` has floors so retrieval can't quietly get worse.
+Be careful reading the last column. After the first run I fixed what the failures showed (a keyword floor, a word-coverage check, a better stemmer and a few phrases), so the held-out and fresh sets are no longer independent evidence; the "first run" column is the fair one. The MFA rows were added when the lab gained runbooks 20 to 23. The held-out queries were committed before any change to `data/phrases.yaml`, so 6 of 10 is the honest first-run number. I then tuned on the MFA dev set only, and re-ran the held-out set once: 7 of 10, because one query (a new starter's setup page) now matches. The three misses are not tuned for: a Wi-Fi ticket that lands on runbook 05, "I got a new phone and need to move my authenticator" and "the code arrives by text message late", which should match nothing but retrieve weak MFA runbooks. The last two are service requests the retriever has no phrase for, and I left them as a real gap rather than tuning on them.
+
+`tests/test_retrieval.py` has floors so retrieval can't quietly get worse.
 
 ### The cold set
 
