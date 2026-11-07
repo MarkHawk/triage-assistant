@@ -1,0 +1,2 @@
+# Fake session cookie in the pipeline test (checks a ticket containing a secret gets a warning): deliberate test value
+c5b983ca7f0c271915a1e8f71e8cea94f1b742f1:tests/test_pipeline.py:generic-api-key:192
